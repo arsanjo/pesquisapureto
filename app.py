@@ -49,7 +49,7 @@ st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para
 st.markdown("---")
 
 # =========================================================
-# SEGMENTO (fora do formulário para atualizar perguntas dinamicamente)
+# SEGMENTO
 # =========================================================
 segmento = st.radio("**Sua compra na Pureto foi?**", ["Restaurante (Salão)", "Delivery (Entrega)"], horizontal=True)
 st.markdown("---")
@@ -168,4 +168,3 @@ if ADMIN_KEY in query and query[ADMIN_KEY] == ADMIN_PASSWORD:
     st.title("🔐 Dashboard Administrativo")
     df = st.session_state.respostas
     if len(df) > 0:
-        nps, p, n, d, t =
