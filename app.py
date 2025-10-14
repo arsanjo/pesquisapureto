@@ -1,1 +1,254 @@
-eu coloquei esse codigo e funcionou import streamlit as st import pandas as pd from datetime import datetime import os # ============================================================ # CONFIGURAÇÕES INICIAIS # ============================================================ st.set_page_config(page_title="Pesquisa de Satisfação — Pureto Sushi & Burger", layout="wide") GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review" # ============================================================ # INICIALIZAÇÃO DE ESTADOS # ============================================================ # Inicializa o DataFrame para armazenar as respostas, se ainda não existir if "respostas" not in st.session_state: st.session_state.respostas = pd.DataFrame(columns=[ "Data", "Nome", "Whatsapp", "Aniversario", "Como_Conheceu", "Segmento", "Nota1", "Nota2", "Nota3", "Nota4", "Nota5", "NPS", "Comentario" ]) # ============================================================ # FUNÇÃO DE CÁLCULO NPS # ============================================================ def calcular_nps(df): if df.empty: return 0, 0, 0, 0, 0 total = len(df) promotores = df[df["NPS"] >= 9].count().NPS detratores = df[df["NPS"] <= 6].count().NPS perc_prom = (promotores / total) * 100 perc_det = (detratores / total) * 100 perc_neut = 100 - perc_prom - perc_det nps_score = perc_prom - perc_det return nps_score, perc_prom, perc_neut, perc_det, total # ============================================================ # INTERFACE PRINCIPAL (CLIENTE) # ============================================================ st.title("Pesquisa de Satisfação") st.markdown("Sua opinião é muito importante para nós! Leva menos de 1 minuto.") # --- MUDANÇA PRINCIPAL: SELETOR DE SEGMENTO FORA DO FORMULÁRIO --- # Este widget agora fica fora do form para permitir o recarregamento automático da página segmento = st.radio( "Primeiro, conte pra gente: onde foi sua experiência?", ["Restaurante (Salão)", "Delivery (Entrega)"], horizontal=True, key="segmento_selecionado" # Usar uma chave para manter o estado ) # O formulário começa DEPOIS da seleção de segmento with st.form("formulario"): # Os campos de dados pessoais continuam no formulário col1, col2, col3 = st.columns([2, 2, 1]) nome = col1.text_input("Seu Nome Completo:") whatsapp = col2.text_input("Seu WhatsApp:") aniversario = col3.date_input("Data de Aniversário:", value=None, # Melhor iniciar como None format="DD/MM/YYYY") como_conheceu = st.selectbox( "Como você conheceu o Pureto?", ["Instagram", "Facebook", "Google", "Indicação de amigo ou familiar", "Já era cliente do Delivery", "Já era cliente do Restaurante", "Outro"] ) st.markdown("---") # ============================================================ # PERGUNTAS DINÂMICAS (AGORA FUNCIONA AUTOMATICAMENTE) # ============================================================ # O bloco if/elif agora funciona porque a variável 'segmento' é atualizada instantaneamente if segmento == "Restaurante (Salão)": st.subheader("🍽️ Avaliação no Salão") # Usamos st.slider que é mais visual para notas de 0 a 10 nota1 = st.slider("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", 0, 10, key="nota1_salao") nota2 = st.slider("2️⃣ Qualidade e sabor dos pratos:", 0, 10, key="nota2_salao") nota3 = st.slider("3️⃣ Limpeza e conforto do ambiente:", 0, 10, key="nota3_salao") nota4 = st.slider("4️⃣ O quanto você nos recomendaria a um amigo ou familiar?", 0, 10, key="nota4_salao") nota5 = None # Não há quinta nota para o salão nps = nota4 elif segmento == "Delivery (Entrega)": st.subheader("🚗 Avaliação do Delivery") # Usamos st.slider aqui também nota1 = st.slider("1️⃣ Facilidade e atendimento no pedido:", 0, 10, key="nota1_delivery") nota2 = st.slider("2️⃣ Rapidez da entrega:", 0, 10, key="nota2_delivery") nota3 = st.slider("3️⃣ Qualidade e sabor dos pratos entregues:", 0, 10, key="nota3_delivery") nota4 = st.slider("4️⃣ Condição da embalagem ao chegar:", 0, 10, key="nota4_delivery") nota5 = st.slider("5️⃣ O quanto você nos recomendaria a um amigo ou familiar?", 0, 10, key="nota5_delivery") nps = nota5 st.markdown("---") comentario = st.text_area("Comentários, sugestões, elogios ou reclamações (opcional):", max_chars=500) # O botão de envio permanece no final do formulário submit = st.form_submit_button("Enviar Respostas") # ============================================================ # ENVIO E FEEDBACK (Lógica permanece a mesma) # ============================================================ if submit: if not nome: st.error("Por favor, preencha seu nome.") elif not aniversario: st.error("Por favor, preencha sua data de aniversário.") else: aniversario_str = aniversario.strftime("%d/%m/%Y") nova_resposta = pd.DataFrame({ "Data": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")], "Nome": [nome], "Whatsapp": [whatsapp], "Aniversario": [aniversario_str], "Como_Conheceu": [como_conheceu], "Segmento": [segmento], # A variável 'segmento' vem de fora do form "Nota1": [nota1], "Nota2": [nota2], "Nota3": [nota3], "Nota4": [nota4], "Nota5": [nota5], "NPS": [nps], "Comentario": [comentario] }) st.session_state.respostas = pd.concat([st.session_state.respostas, nova_resposta], ignore_index=True) st.success(f"{nome}, muito obrigado pelas suas respostas sinceras!") st.markdown(""" <div style='background-color:#e8f5e9;padding:20px;border-radius:10px;'> <h4>Seu feedback é essencial para aperfeiçoarmos cada detalhe do Pureto Sushi 🍣</h4> <p>Como forma de agradecimento, você ganhou um cupom especial de <b>10% de desconto</b> na sua próxima compra.</p> <p><b>Use o código:</b> <span style='color:#1565c0;'>PESQUISA</span></p> </div> """, unsafe_allow_html=True) if nps >= 9: st.balloons() st.markdown(f""" <div style='background-color:#fff3cd;padding:20px;border-radius:10px;margin-top:10px;'> <h4>🌟 {nome}, já que você nos avaliou tão bem...</h4> <p>Seria incrível se você pudesse deixar uma <b>avaliação rápida no Google</b> sobre sua experiência.</p> <a href='{GOOGLE_REVIEW_LINK}' target='_blank' style='background:#f0ad4e;color:white;padding:10px 20px;border-radius:5px;text-decoration:none;'>Deixar Avaliação no Google</a> </div> """, unsafe_allow_html=True) # ============================================================ # PAINEL ADMINISTRATIVO (Lógica permanece a mesma) # ============================================================ query_params = st.query_params if "admin" in query_params and query_params["admin"] == "1": st.title("🔒 Painel Administrativo") senha = st.text_input("Digite a senha de administrador:", type="password") if senha == os.getenv("ADMIN_PASSWORD", "pureto2025"): st.success("Acesso autorizado ✅") df = st.session_state.respostas if not df.empty: nps_geral, _, _, _, _ = calcular_nps(df) st.metric("NPS Geral", f"{nps_geral:.1f}") csv = df.to_csv(index=False).encode("utf-8") st.download_button("📥 Baixar Respostas (CSV)", csv, "respostas_pesquisa.csv", "text/csv") st.dataframe(df.sort_values(by="Data", ascending=False), use_container_width=True) else: st.info("Nenhuma resposta coletada ainda.") elif senha: st.error("Senha incorreta.") # ============================================================ # RODAPÉ (Lógica permanece a mesma) # ============================================================ st.markdown(""" <hr> <div style='text-align:center; color:gray;'> Desenvolvido por <b>Arsanjo</b> — Romanos 8:37<br> <i>"Somos mais do que vencedores."</i> </div> """, unsafe_allow_html=True) é igual ao que voce me mandou?
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+
+# =========================================================
+# CONFIGURAÇÃO GERAL
+# =========================================================
+st.set_page_config(page_title="Pesquisa de Satisfação - Pureto Sushi", layout="wide")
+GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review" 
+
+# =========================================================
+# FUNÇÃO: CÁLCULO DO NPS
+# =========================================================
+def calcular_nps(df):
+    if df.empty:
+        return 0, 0, 0, 0, 0
+    total = len(df)
+    
+    if 'NPS_Recomendacao' not in df.columns:
+        return 0, 0, 0, 0, 0
+        
+    promotores = df[df['NPS_Recomendacao'] >= 9].shape[0]
+    detratores = df[df['NPS_Recomendacao'] <= 6].shape[0]
+    perc_prom = (promotores / total) * 100
+    perc_det = (detratores / total) * 100
+    perc_neut = 100 - perc_prom - perc_det
+    nps_score = perc_prom - perc_det
+    return nps_score, perc_prom, perc_neut, perc_det, total
+
+# =========================================================
+# ESTADOS INICIAIS
+# =========================================================
+if 'respostas' not in st.session_state:
+    st.session_state.respostas = pd.DataFrame(columns=[
+        'Data', 'Nome', 'Whatsapp', 'Aniversario', 'Como_Conheceu', 'Segmento',
+        'Nota_Atendimento', 'Nota_Qualidade_Sabor', 'Nota_Entrega_Ambiente',
+        'Nota_Pedido_Embalagem', 'NPS_Recomendacao', 'Comentario'
+    ])
+# Variável para o campo 'Outro:'
+if 'como_conheceu_outro_temp' not in st.session_state:
+    st.session_state.como_conheceu_outro_temp = ""
+
+# =========================================================
+# INTERFACE DO FORMULÁRIO
+# =========================================================
+st.markdown("<h1 style='text-align:center;'>Pesquisa de Satisfação</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós! Leva menos de 40 segundos.</p>", unsafe_allow_html=True) 
+st.markdown("---")
+
+# Variáveis para o escopo de envio, inicializadas fora do form
+nota_atendimento = 0
+nota_qualidade_sabor = 0
+nota_ambiente_logistica = 0
+nota_pedido_embalagem_delivery = None
+nps_recomendacao = 0
+opcoes_notas = list(range(0, 11))
+
+
+with st.form("pesquisa_form"):
+    
+    # 2. SELEÇÃO DO SEGMENTO
+    segmento = st.radio(
+        "**Sua compra na Pureto foi?**", 
+        options=["Restaurante (Salão)", "Delivery (Entrega)"],
+        horizontal=True,
+        key='seg_radio'
+    )
+    st.markdown("---")
+
+    # 1. DADOS DE IDENTIFICAÇÃO (FIXOS)
+    st.subheader("Sobre você")
+    col1, col2, col3 = st.columns(3)
+    nome = col1.text_input("**Seu nome completo:**", key='nome_input')
+    whatsapp = col2.text_input("**Seu WhatsApp:**", key='whats_input')
+    
+    # Data de Aniversário (DD/MM/AAAA garantido no salvamento)
+    aniversario = col3.date_input(
+        "**Data de aniversário (DD/MM/AAAA):**",
+        value=datetime.today().date(), 
+        min_value=datetime(1900, 1, 1).date(),
+        max_value=datetime.today().date(),
+        key='aniv_input'
+    )
+
+    # Lógica Como Conheceu
+    opcoes_conheceu_base = [
+        "Instagram", "Facebook", "Google", "Indicação de amigo/familiar",
+        "Passando em frente ao restaurante", "Placa na entrada de Schroeder (ponte)",
+        "Outro:"
+    ]
+    if segmento == "Restaurante (Salão)":
+        opcoes_conheceu = ["Já era cliente do delivery"] + opcoes_conheceu_base
+    else:
+        opcoes_conheceu = ["Já era cliente do salão"] + opcoes_conheceu_base
+
+    como_conheceu = st.selectbox(
+        "**Como nos conheceu?**",
+        ["Selecione uma opção"] + opcoes_conheceu,
+        key='conheceu_select'
+    )
+
+    # 🚨 CORREÇÃO LÓGICA "OUTRO:": Exibe o campo de texto condicionalmente
+    if como_conheceu == "Outro:":
+        st.session_state.como_conheceu_outro_temp = st.text_input("Como nos conheceu? (Especifique):", key='outro_input')
+    else:
+        st.session_state.como_conheceu_outro_temp = ""
+    
+    st.markdown("---")
+
+    # =========================================================
+    # PERGUNTAS AVALIATIVAS (Lógica de exibição CORRIGIDA)
+    # =========================================================
+    
+    if segmento == "Restaurante (Salão)":
+        st.subheader("🍽️ Avaliação no Salão")
+        nota_atendimento = st.radio("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", opcoes_notas, horizontal=True, key='nota_atendimento_s')
+        nota_qualidade_sabor = st.radio("2️⃣ Qualidade e sabor dos pratos:", opcoes_notas, horizontal=True, key='nota_qualidade_s')
+        nota_ambiente_logistica = st.radio("3️⃣ Ambiente e limpeza:", opcoes_notas, horizontal=True, key='nota_ambiente_s')
+        
+        nota_pedido_embalagem_delivery = None # Nulo para Salão
+        nps_recomendacao = st.radio("4️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria a um amigo ou familiar?", opcoes_notas, horizontal=True, key='nps_radio_s')
+
+    else: # Delivery (Entrega)
+        st.subheader("🛵 Avaliação do Delivery")
+        nota_atendimento = st.radio("1️⃣ Atendimento e facilidade do pedido:", opcoes_notas, horizontal=True, key='nota_atendimento_d')
+        
+        nota_pedido_embalagem_delivery = st.radio("2️⃣ Logística (tempo e embalagem):", opcoes_notas, horizontal=True, key='nota_embalagem_d')
+        
+        nota_qualidade_sabor = st.radio("3️⃣ Qualidade e sabor pós-entrega:", opcoes_notas, horizontal=True, key='nota_qualidade_d')
+        nota_ambiente_logistica = st.radio("4️⃣ Apresentação e cuidado com os itens:", opcoes_notas, horizontal=True, key='nota_ambiente_d')
+        
+        nps_recomendacao = st.radio("5️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria a um amigo ou familiar?", opcoes_notas, horizontal=True, key='nps_radio_d')
+    
+    st.markdown("---")
+
+    comentario = st.text_area(
+        "💬 Comentários, sugestões, elogios ou reclamações (opcional):",
+        max_chars=500,
+        key='comentario_input'
+    )
+
+    enviar = st.form_submit_button("Enviar Respostas ✅")
+
+# =========================================================
+# PROCESSAMENTO DE RESPOSTA
+# =========================================================
+if enviar:
+    # 1. Validação
+    if not nome or not whatsapp or como_conheceu == "Selecione uma opção":
+        st.error("⚠️ Por favor, preencha Nome, WhatsApp e Como nos conheceu.")
+        # Mantém a execução para que o formulário permaneça com os dados preenchidos
+    else:
+        # 2. Processamento e Armazenamento
+        
+        # GARANTIA DA DATA DD/MM/AAAA NO SALVAMENTO
+        aniversario_str = aniversario.strftime("%d/%m/%Y") 
+        como_final = st.session_state.como_conheceu_outro_temp if como_conheceu == "Outro:" else como_conheceu
+
+        nova = pd.DataFrame([{
+            "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "Nome": nome,
+            "Whatsapp": whatsapp,
+            "Aniversario": aniversario_str,
+            "Como_Conheceu": como_final,
+            "Segmento": segmento,
+            "Nota_Atendimento": nota_atendimento,
+            "Nota_Qualidade_Sabor": nota_qualidade_sabor,
+            "Nota_Entrega_Ambiente": nota_ambiente_logistica,
+            "Nota_Pedido_Embalagem": nota_pedido_embalagem_delivery,
+            "NPS_Recomendacao": nps_recomendacao,
+            "Comentario": comentario
+        }])
+        
+        st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
+        
+        # 3. Exibição das Mensagens e Agradecimento
+        
+        # Limpa a tela e mostra as mensagens no topo
+        st.empty() 
+        
+        st.success("✅ Pesquisa enviada com sucesso!")
+        
+        # ✅ Mensagem padrão (Cupom)
+        st.markdown(
+            f"""
+            <div style='background-color:#e8f5e9; color:#1b5e20; padding:20px; border-radius:10px; margin-top:20px;'>
+                <h3>🎉 {nome}, muito obrigado pelas suas respostas sinceras!</h3>
+                <p>Seu feedback é essencial para aperfeiçoarmos cada detalhe do <b>Pureto Sushi</b>.</p>
+                <p>Para agradecer, você ganhou um <b>cupom especial de 10% de desconto</b> na sua próxima compra.</p>
+                <p style='font-size:1.2em;'><b>Use o código:</b> <span style='color:#007bff;'>PESQUISA</span></p>
+            </div>
+            """, unsafe_allow_html=True
+        )
+
+        # ⭐ Mensagem condicional (Google + Entrega Grátis)
+        if nps_recomendacao > 8:
+            st.balloons()
+            st.markdown(
+                f"""
+                <div style='background-color:#fff3cd; color:#856404; padding:20px; border-radius:10px; margin-top:25px;'>
+                    <h4 style='font-weight:bold; color:#856404;'>Google <span style='font-size:1.5em;'>⭐⭐⭐⭐⭐</span></h4>
+                    <p>{nome}, e que tal compartilhá-la essa sua incrível opinião lá no Google com um comentário positivo? Isso nos ajuda muito! 🙏</p>
+                    <p style='font-weight:bold;'>Como gratidão por essa parte, sua próxima entrega é grátis.</p>
+                    <a href='{GOOGLE_REVIEW_LINK}' target='_blank'
+                    style='background-color:#f0ad4e; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;'>
+                        💬 Avaliar no Google
+                    </a>
+                </div>
+                """, unsafe_allow_html=True
+            )
+        
+        st.markdown("---")
+        st.info("✅ Suas respostas foram registradas com sucesso. Obrigado por contribuir!")
+        
+        # Força o reinício para limpar a tela e prepara o próximo uso
+        st.rerun() 
+
+# =========================================================
+# ÁREA ADMINISTRATIVA (ACESSO VIA URL SECRETA)
+# =========================================================
+ADMIN_KEY = 'admin'
+ADMIN_PASSWORD = 'pureto2025' 
+query_params = st.query_params
+
+if ADMIN_KEY in query_params and query_params[ADMIN_KEY] == ADMIN_PASSWORD:
+    st.markdown("---")
+    st.title("🔐 Dashboard Administrativo")
+    st.subheader("Acesso liberado (apenas para o link secreto)")
+
+    df_admin = st.session_state.respostas
+    total_admin = len(df_admin)
+    
+    if total_admin > 0:
+        nps_admin, prom, neut, det, total = calcular_nps(df_admin)
+        
+        col_nps, col_total = st.columns(2)
+        col_nps.metric("NPS Score", f"{nps_admin:.1f}")
+        col_total.metric("Total Respostas", total)
+
+        # Download
+        @st.cache_data
+        def convert_df(df):
+            return df.to_csv(index=False).encode("utf-8")
+
+        csv = convert_df(df_admin)
+        st.download_button(
+            label="⬇️ Baixar Relatório Completo (CSV)",
+            data=csv,
+            file_name='relatorio_pesquisa_pureto.csv',
+            mime='text/csv'
+        )
+        st.dataframe(df_admin.sort_values(by="Data", ascending=False), use_container_width=True)
+    else:
+        st.warning("Ainda não há respostas registradas nesta sessão.")
