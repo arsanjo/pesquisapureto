@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import os
 
 # ============================================================
 # CONFIGURAÇÕES INICIAIS
@@ -18,8 +17,7 @@ def calcular_nps(df):
     if df.empty or "NPS_Recomendacao" not in df.columns:
         return 0, 0, 0, 0, 0
     total = len(df)
-    # Correção: Usando .sum() para garantir que a soma seja feita corretamente
-    promotores = (df["NPS_Recomendacao"] >= 9).sum() 
+    promotores = (df["NPS_Recomendacao"] >= 9).sum()
     detratores = (df["NPS_Recomendacao"] <= 6).sum()
     perc_prom = (promotores / total) * 100
     perc_det = (detratores / total) * 100
@@ -31,7 +29,7 @@ def calcular_nps(df):
 def to_csv_bytes(df):
     return df.to_csv(index=False).encode("utf-8")
 
-# Função para forçar o formato DD/MM/AAAA na string
+# Função para forçar o formato DD/MM/AAAA na string (para text_input)
 def formatar_data(d):
     digits = "".join(c for c in d if c.isdigit())
     if len(digits) == 8:
@@ -49,16 +47,12 @@ if "respostas" not in st.session_state:
     ])
 
 # =========================================================
-# TÍTULO
+# TÍTULO E SEGMENTO
 # =========================================================
 st.markdown("<h1 style='text-align:center;'>Pesquisa de Satisfação</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós! Leva menos de 40 segundos.</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# =========================================================
-# SEGMENTO
-# =========================================================
-# Movido para fora do form para permitir a atualização instantânea da lógica IF/ELSE no form
 segmento = st.radio("**Sua compra na Pureto foi?**", ["Restaurante (Salão)", "Delivery (Entrega)"], horizontal=True, key="segmento_selecionado")
 st.markdown("---")
 
@@ -71,9 +65,9 @@ with st.form("pesquisa_form"):
     nome = col1.text_input("Seu nome completo:")
     whatsapp = col2.text_input("Seu WhatsApp:")
     
-    # Data de aniversário via TEXT INPUT para forçar o formato DD/MM/AAAA
+    # Data de aniversário via TEXT INPUT (já formatada pela função)
     aniversario_raw = col3.text_input("Data de aniversário (DD/MM/AAAA):", placeholder="Ex: 14101972 (apenas números)")
-    aniversario = formatar_data(aniversario_raw) # Formato validado
+    aniversario = formatar_data(aniversario_raw)
 
     st.markdown("---")
     
@@ -91,11 +85,11 @@ with st.form("pesquisa_form"):
 
     como_conheceu = st.selectbox("Como nos conheceu?", opcoes_conheceu, key="conheceu_select")
     
-    # 🚨 LÓGICA "OUTRO:" (Campo condicional)
+    # Campo "Outro:" Condicional
     if como_conheceu == "Outro:":
         como_outro = st.text_input("Como nos conheceu? (Especifique):", key="como_outro_input")
     else:
-        como_outro = "" # Garante que a variável exista para o envio
+        como_outro = ""
 
     st.markdown("---")
     opcoes = list(range(0, 11))
@@ -108,7 +102,7 @@ with st.form("pesquisa_form"):
         nota_atend = st.radio("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", opcoes, horizontal=True)
         nota_sabor = st.radio("2️⃣ Qualidade e sabor dos pratos:", opcoes, horizontal=True)
         nota_ambiente = st.radio("3️⃣ Ambiente e limpeza:", opcoes, horizontal=True)
-        # nota_embalagem já é None
+        nota_embalagem = None
         nps = st.radio("4️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria?", opcoes, horizontal=True)
     else:
         st.subheader("🛵 Avaliação do Delivery")
@@ -122,39 +116,45 @@ with st.form("pesquisa_form"):
     submit = st.form_submit_button("Enviar Respostas ✅")
 
 # =========================================================
-# PROCESSAMENTO
+# PROCESSAMENTO (CORRIGIDO)
 # =========================================================
 if submit:
-    # Validação do Aniversário (DD/MM/AAAA)
-    if aniversario and aniversario != aniversario_raw and len(aniversario_raw) != 8:
-        st.warning("⚠️ Formato de data inválido. Por favor, use 8 dígitos (DDMMAAAA) ou deixe em branco.")
-        # Não usamos st.stop(), apenas mostramos o aviso para o usuário corrigir no formulário
-    elif not nome or not whatsapp or como_conheceu == "Selecione uma opção":
+    # 🚨 CORREÇÃO: Usamos o nome da variável local 'como_conheceu' para validação
+    if not nome or not whatsapp or como_conheceu == "Selecione uma opção":
         st.error("⚠️ Por favor, preencha Nome, WhatsApp e Como nos conheceu.")
     else:
-        # Se for Salão, o campo 'Nota_Pedido_Embalagem' deve ser None
-        nota_embalagem_final = nota_embalagem if segmento == "Delivery (Entrega)" else None
+        # 1. Validação da Data (melhoria de UX)
+        aniversario_fmt = ""
+        try:
+            if aniversario_raw: # Apenas valida se o campo foi preenchido
+                datetime.strptime(aniversario, "%d/%m/%Y")
+                aniversario_fmt = aniversario
+        except ValueError:
+            st.warning("⚠️ Data de aniversário inválida. Use o formato DD/MM/AAAA (8 dígitos).")
+            st.stop() # Interrompe o processamento do DataFrame
+
+        # 2. Criação do DataFrame
+        # 🚨 CORREÇÃO: Usamos o nome da variável local 'como_conheceu' para decidir o valor final
+        como_conheceu_final = como_outro if como_conheceu == "Outro:" else como_conheceu
         
         nova = pd.DataFrame([{
             "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "Nome": nome,
             "Whatsapp": whatsapp,
-            "Aniversario": aniversario, # Valor já formatado por formatar_data()
-            "Como_Conheceu": como_outro if como_conheceu == "Outro:" else como_conheceu,
+            "Aniversario": aniversario_fmt,
+            "Como_Conheceu": como_conheceu_final,
             "Segmento": segmento,
             "Nota_Atendimento": nota_atend,
             "Nota_Qualidade_Sabor": nota_sabor,
             "Nota_Entrega_Ambiente": nota_ambiente,
-            "Nota_Pedido_Embalagem": nota_embalagem_final,
+            "Nota_Pedido_Embalagem": nota_embalagem,
             "NPS_Recomendacao": nps,
             "Comentario": comentario
         }])
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
-        # 🚨 MENSAGENS DE AGRADECIMENTO (Duas mensagens, uma após a outra)
+        # 3. Mensagens de Sucesso
         st.success("✅ Pesquisa enviada com sucesso!")
-        
-        # 1ª Mensagem: Cupom
         st.markdown(f"""
         <div style='background-color:#e8f5e9; color:#1b5e20; padding:20px; border-radius:10px; margin-top:20px;'>
         <h3>🎉 {nome}, muito obrigado pelas suas respostas sinceras!</h3>
@@ -164,14 +164,13 @@ if submit:
         </div>
         """, unsafe_allow_html=True)
 
-        # 2ª Mensagem: Google + Entrega Grátis
         if nps >= 9:
             st.balloons()
             st.markdown(f"""
             <div style='background-color:#fff3cd; color:#856404; padding:20px; border-radius:10px; margin-top:25px;'>
-            <h4 style='font-weight:bold;'>Google <span style='font-size:1.5em;'>⭐⭐⭐⭐⭐</span></h4>
-            <p>{nome}, e que tal compartilhá-la essa sua incrível opinião lá no Google com um comentário positivo? Isso nos ajuda muito! 🙏</p>
-            <p style='font-weight:bold;'>Como gratidão por essa parte, sua próxima entrega é grátis.</p>
+            <h4 style='font-weight:bold;'>Google ⭐⭐⭐⭐⭐</h4>
+            <p>{nome}, e que tal compartilhar sua opinião lá no Google? Isso nos ajuda muito! 🙏</p>
+            <p><b>Como gratidão, sua próxima entrega é grátis!</b></p>
             <a href='{GOOGLE_REVIEW_LINK}' target='_blank'
                style='background-color:#f0ad4e; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;'>
                💬 Avaliar no Google
@@ -198,4 +197,4 @@ if ADMIN_KEY in query and query[ADMIN_KEY] == ADMIN_PASSWORD:
         st.download_button("📥 Baixar Respostas (CSV)", csv, "respostas_pesquisa.csv", "text/csv")
         st.dataframe(df.sort_values(by="Data", ascending=False), use_container_width=True)
     else:
-        st.warning("Ainda não há respostas registradas.")
+        st.warning("Ainda não há respostas coletadas.")
