@@ -44,14 +44,12 @@ if "admin" in query_params and query_params["admin"] == "1":
     df = st.session_state.respostas
     
     if not df.empty:
-        # Calcular e exibir métricas principais
         nps_geral, total_respostas = calcular_nps(df)
         
         col1, col2 = st.columns(2)
         col1.metric("NPS Geral", f"{nps_geral:.1f}")
         col2.metric("Total de Respostas", total_respostas)
 
-        # Botão para baixar os dados
         csv = df.to_csv(index=False).encode("utf-8")
         st.download_button(
             label="📥 Baixar Todas as Respostas (CSV)",
@@ -60,7 +58,6 @@ if "admin" in query_params and query_params["admin"] == "1":
             mime="text/csv",
         )
         
-        # Exibir a tabela com as respostas
         st.dataframe(df.sort_values(by="Data", ascending=False), use_container_width=True)
         
     else:
@@ -83,7 +80,6 @@ else:
         nome = col1.text_input("Seu Nome Completo:")
         whatsapp = col2.text_input("Seu WhatsApp (com DDD):")
         
-        # CORREÇÃO: Definindo um intervalo de datas válido para aniversário
         today = date.today()
         min_date = today.replace(year=today.year - 100)
         aniversario = col3.date_input(
@@ -99,6 +95,14 @@ else:
             ["Instagram", "Facebook", "Google", "Indicação de amigo ou familiar",
              "Já era cliente do Delivery", "Já era cliente do Restaurante", "Outro"]
         )
+        
+        # CORREÇÃO: Campo de texto condicional para "Outro"
+        como_conheceu_outro = ""
+        if como_conheceu == "Outro":
+            como_conheceu_outro = st.text_input(
+                "Por favor, especifique como nos conheceu:",
+                placeholder="Ex: Vi a fachada, Anúncio no rádio, etc."
+            )
 
         st.markdown("---")
 
@@ -112,7 +116,6 @@ else:
             nps = nota4
 
         elif segmento == "Delivery (Entrega)":
-            # CORREÇÃO: Ícone da moto
             st.subheader("🛵 Avaliação do Delivery")
             nota1 = st.radio("1️⃣ Facilidade e atendimento no pedido:", list(range(11)), horizontal=True, key="nota1_delivery")
             nota2 = st.radio("2️⃣ Rapidez da entrega:", list(range(11)), horizontal=True, key="nota2_delivery")
@@ -130,10 +133,15 @@ else:
         if not nome or not whatsapp or not aniversario:
             st.error("Por favor, preencha seu Nome, WhatsApp e Data de Aniversário.")
         else:
+            # Lógica para salvar a resposta do campo "Outro"
+            como_conheceu_final = como_conheceu
+            if como_conheceu == "Outro" and como_conheceu_outro:
+                como_conheceu_final = f"Outro: {como_conheceu_outro}"
+
             aniversario_str = aniversario.strftime("%d/%m/%Y")
             nova_resposta = pd.DataFrame({
                 "Data": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")], "Nome": [nome], "Whatsapp": [whatsapp],
-                "Aniversario": [aniversario_str], "Como_Conheceu": [como_conheceu], "Segmento": [segmento],
+                "Aniversario": [aniversario_str], "Como_Conheceu": [como_conheceu_final], "Segmento": [segmento],
                 "Nota1": [nota1], "Nota2": [nota2], "Nota3": [nota3], "Nota4": [nota4], "Nota5": [nota5],
                 "NPS": [nps], "Comentario": [comentario]
             })
@@ -160,7 +168,6 @@ else:
 # ============================================================
 # RODAPÉ (Exibido em ambas as páginas)
 # ============================================================
-# CORREÇÃO: Estética do rodapé
 st.markdown("""
 <hr style="margin-top: 50px;">
 <div style='text-align:center; color:gray; font-size: 0.9em;'>
