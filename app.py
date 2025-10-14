@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-import os
+from datetime import datetime, date
 
 # ============================================================
 # CONFIGURAÇÕES INICIAIS
@@ -23,7 +22,7 @@ if "respostas" not in st.session_state:
 # ============================================================
 def calcular_nps(df):
     if df.empty:
-        return 0, 0, 0, 0, 0
+        return 0, 0
     total = len(df)
     promotores = df[df["NPS"] >= 9].count().NPS
     detratores = df[df["NPS"] <= 6].count().NPS
@@ -83,7 +82,17 @@ else:
         col1, col2, col3 = st.columns([2, 2, 1])
         nome = col1.text_input("Seu Nome Completo:")
         whatsapp = col2.text_input("Seu WhatsApp (com DDD):")
-        aniversario = col3.date_input("Data de Aniversário:", value=None, format="DD/MM/YYYY")
+        
+        # CORREÇÃO: Definindo um intervalo de datas válido para aniversário
+        today = date.today()
+        min_date = today.replace(year=today.year - 100)
+        aniversario = col3.date_input(
+            "Data de Aniversário:",
+            value=None,
+            min_value=min_date,
+            max_value=today,
+            format="DD/MM/YYYY"
+        )
 
         como_conheceu = st.selectbox(
             "Como você conheceu o Pureto?",
@@ -103,7 +112,8 @@ else:
             nps = nota4
 
         elif segmento == "Delivery (Entrega)":
-            st.subheader("🚗 Avaliação do Delivery")
+            # CORREÇÃO: Ícone da moto
+            st.subheader("🛵 Avaliação do Delivery")
             nota1 = st.radio("1️⃣ Facilidade e atendimento no pedido:", list(range(11)), horizontal=True, key="nota1_delivery")
             nota2 = st.radio("2️⃣ Rapidez da entrega:", list(range(11)), horizontal=True, key="nota2_delivery")
             nota3 = st.radio("3️⃣ Qualidade e sabor dos pratos entregues:", list(range(11)), horizontal=True, key="nota3_delivery")
@@ -150,10 +160,12 @@ else:
 # ============================================================
 # RODAPÉ (Exibido em ambas as páginas)
 # ============================================================
+# CORREÇÃO: Estética do rodapé
 st.markdown("""
 <hr style="margin-top: 50px;">
-<div style='text-align:center; color:gray;'>
-Desenvolvido por <b>Arsanjo</b> — Romanos 8:37<br>
-<i>"Somos mais do que vencedores."</i>
+<div style='text-align:center; color:gray; font-size: 0.9em;'>
+    <i>"Somos mais do que vencedores." — Romanos 8:37</i>
+    <br>
+    Desenvolvido por <b>Arsanjo</b>
 </div>
 """, unsafe_allow_html=True)
