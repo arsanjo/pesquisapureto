@@ -1,52 +1,32 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
-import gspread
-from google.oauth2.service_account import Credentials
 
 # ============================================================
-# CONFIGURAÇÕES INICIAIS E CONEXÃO COM GOOGLE SHEETS
+# CONFIGURAÇÕES INICIAIS
 # ============================================================
 st.set_page_config(page_title="Pesquisa de Satisfação — Pureto", layout="wide")
 GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
 
-# Definir o escopo de permissões (COM A CORREÇÃO)
-scopes = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive.file"
-]
-creds = Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"], scopes=scopes
-)
-client = gspread.authorize(creds)
-
-# Abrir a planilha pelo nome definido nos Secrets
-sheet_name = st.secrets["google_sheet"]["sheet_name"]
-spreadsheet = client.open(sheet_name)
-worksheet = spreadsheet.worksheet(spreadsheet.worksheets()[0].title)
+# ============================================================
+# INICIALIZAÇÃO DE ESTADOS (ARMAZENAMENTO EM MEMÓRIA)
+# ============================================================
+if "respostas" not in st.session_state:
+    st.session_state.respostas = pd.DataFrame(columns=[
+        "Data", "Nome", "Whatsapp", "Aniversario", "Como_Conheceu",
+        "Segmento", "Nota1", "Nota2", "Nota3", "Nota4", "Nota5", "NPS", "Comentario"
+    ])
 
 # ============================================================
-# FUNÇÕES DE DADOS E CÁLCULO
+# FUNÇÃO DE CÁLCULO NPS
 # ============================================================
-def read_data():
-    """Lê os dados da planilha e retorna como DataFrame."""
-    records = worksheet.get_all_records()
-    if not records:
-        return pd.DataFrame()
-    return pd.DataFrame(records)
-
-def write_data(df_row):
-    """Escreve uma nova linha de dados na planilha."""
-    values = df_row.values.tolist()[0]
-    worksheet.append_row(values, value_input_option="USER_ENTERED")
-
 def calcular_nps(df):
-    """Calcula o NPS a partir de um DataFrame."""
-    if df.empty or "NPS" not in df.columns or df["NPS"].isnull().all():
+    if df.empty:
         return 0, 0
     total = len(df)
-    promotores = df[df["NPS"] >= 9].shape[0]
-    detratores = df[df["NPS"] <= 6].shape[0]
+    nps_scores = pd.to_numeric(df["NPS"])
+    promotores = (nps_scores >= 9).sum()
+    detratores = (nps_scores <= 6).sum()
     nps_score = ((promotores - detratores) / total) * 100
     return nps_score, total
 
@@ -55,39 +35,33 @@ def calcular_nps(df):
 # ============================================================
 query_params = st.query_params
 
-# --- VISÃO DO ADMINISTRADOR ---
 if "admin" in query_params and query_params["admin"] == "1":
     st.title("🔒 Painel Administrativo de Respostas")
-    st.markdown("Resultados coletados da pesquisa de satisfação, lidos diretamente da Planilha Google.")
+    st.markdown("As respostas abaixo são coletadas na memória do aplicativo e serão perdidas se o app reiniciar.")
+    st.warning("**IMPORTANTE:** Baixe o arquivo CSV regularmente para salvar as respostas permanentemente.")
     
-    try:
-        df = read_data()
+    df = st.session_state.respostas
+    
+    if not df.empty:
+        nps_geral, total_respostas = calcular_nps(df)
         
-        if not df.empty:
-            nps_geral, total_respostas = calcular_nps(df)
-            
-            col1, col2 = st.columns(2)
-            col1.metric("NPS Geral", f"{nps_geral:.1f}")
-            col2.metric("Total de Respostas", total_respostas)
+        col1, col2 = st.columns(2)
+        col1.metric("NPS Geral", f"{nps_geral:.1f}")
+        col2.metric("Total de Respostas", total_respostas)
 
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                label="📥 Baixar Todas as Respostas (CSV)",
-                data=csv,
-                file_name="respostas_pesquisa_pureto.csv",
-                mime="text/csv",
-            )
-            
-            st.dataframe(df.sort_values(by="Data", ascending=False), use_container_width=True)
-            
-        else:
-            st.info("Nenhuma resposta foi coletada ainda na Planilha Google.")
-            
-    except Exception as e:
-        st.error(f"Ocorreu um erro ao tentar ler a planilha: {e}")
-        st.info("Verifique se as permissões da planilha e os 'Secrets' do Streamlit estão configurados corretamente.")
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Baixar Respostas (CSV)",
+            data=csv,
+            file_name=f"respostas_pureto_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv",
+            mime="text/csv",
+        )
+        
+        st.dataframe(df.sort_values(by="Data", ascending=False), use_container_width=True)
+        
+    else:
+        st.info("Nenhuma resposta foi coletada ainda.")
 
-# --- VISÃO DO CLIENTE (FORMULÁRIO) ---
 else:
     st.title("Pesquisa de Satisfação")
     st.markdown("Sua opinião é muito importante para nós! Leva menos de 1 minuto.")
@@ -137,7 +111,7 @@ else:
             nota5 = ""
             nps = nota4
 
-        else: # Delivery
+        else:
             st.subheader("🛵 Avaliação do Delivery")
             nota1 = st.radio("1️⃣ Facilidade e atendimento no pedido:", list(range(11)), horizontal=True, key="nota1_delivery")
             nota2 = st.radio("2️⃣ Rapidez da entrega:", list(range(11)), horizontal=True, key="nota2_delivery")
@@ -155,21 +129,20 @@ else:
         if not nome or not whatsapp or not aniversario:
             st.error("Por favor, preencha seu Nome, WhatsApp e Data de Aniversário.")
         else:
-            with st.spinner("Enviando sua resposta..."):
-                como_conheceu_final = como_conheceu
-                if como_conheceu == "Outro" and como_conheceu_outro:
-                    como_conheceu_final = f"Outro: {como_conheceu_outro}"
+            como_conheceu_final = como_conheceu
+            if como_conheceu == "Outro" and como_conheceu_outro:
+                como_conheceu_final = f"Outro: {como_conheceu_outro}"
 
-                aniversario_str = aniversario.strftime("%d/%m/%Y")
-                
-                nova_resposta_df = pd.DataFrame([{
-                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Nome": nome, "Whatsapp": whatsapp,
-                    "Aniversario": aniversario_str, "Como_Conheceu": como_conheceu_final, "Segmento": segmento,
-                    "Nota1": nota1, "Nota2": nota2, "Nota3": nota3, "Nota4": nota4, "Nota5": nota5,
-                    "NPS": nps, "Comentario": comentario
-                }])
-
-                write_data(nova_resposta_df)
+            aniversario_str = aniversario.strftime("%d/%m/%Y")
+            
+            nova_resposta = pd.DataFrame([{
+                "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Nome": nome, "Whatsapp": whatsapp,
+                "Aniversario": aniversario_str, "Como_Conheceu": como_conheceu_final, "Segmento": segmento,
+                "Nota1": nota1, "Nota2": nota2, "Nota3": nota3, "Nota4": nota4, "Nota5": str(nota5),
+                "NPS": nps, "Comentario": comentario
+            }])
+            
+            st.session_state.respostas = pd.concat([st.session_state.respostas, nova_resposta], ignore_index=True)
 
             st.success(f"{nome}, sua avaliação foi registrada com sucesso!")
             st.markdown("""
@@ -178,7 +151,7 @@ else:
             <p>Como agradecimento, use o cupom <b>PESQUISA10</b> e ganhe <b>10% de desconto</b>.</p>
             </div>
             """, unsafe_allow_html=True)
-            if nps >= 9:
+            if int(nps) >= 9:
                 st.balloons()
                 st.markdown(f"""
                 <div style='background-color:#fff3cd;padding:20px;border-radius:10px;margin-top:20px;text-align:center;'>
@@ -188,9 +161,6 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
 
-# ============================================================
-# RODAPÉ
-# ============================================================
 st.markdown("""
 <hr style="margin-top: 50px;">
 <div style='text-align:center; color:gray; font-size: 0.9em;'>
