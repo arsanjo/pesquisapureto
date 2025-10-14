@@ -6,7 +6,7 @@ from datetime import datetime
 # CONFIGURAÇÃO GERAL
 # =========================================================
 st.set_page_config(page_title="Pesquisa de Satisfação - Pureto Sushi", layout="wide")
-GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
+GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review" 
 
 # =========================================================
 # FUNÇÃO: CÁLCULO DO NPS
@@ -15,6 +15,11 @@ def calcular_nps(df):
     if df.empty:
         return 0, 0, 0, 0, 0
     total = len(df)
+    
+    # Garante que a coluna NPS exista
+    if 'NPS_Recomendacao' not in df.columns:
+        return 0, 0, 0, 0, 0
+        
     promotores = df[df['NPS_Recomendacao'] >= 9].shape[0]
     detratores = df[df['NPS_Recomendacao'] <= 6].shape[0]
     perc_prom = (promotores / total) * 100
@@ -24,57 +29,67 @@ def calcular_nps(df):
     return nps_score, perc_prom, perc_neut, perc_det, total
 
 # =========================================================
-# ESTADOS INICIAIS (COLETA DE DADOS - ARMAZENAMENTO TEMPORÁRIO)
-# NOTA: Esta versão armazena dados APENAS durante a sessão do Streamlit Cloud.
-# Para persistência REAL, a versão com CSV ou DB externo deve ser usada, mas exige estabilidade que só um DB oferece.
+# ESTADOS INICIAIS (ARMAZENAMENTO TEMPORÁRIO)
 # =========================================================
 if 'respostas' not in st.session_state:
     st.session_state.respostas = pd.DataFrame(columns=[
         'Data', 'Nome', 'Whatsapp', 'Aniversario', 'Como_Conheceu', 'Segmento',
         'Nota_Atendimento', 'Nota_Qualidade_Sabor', 'Nota_Entrega_Ambiente',
-        'NPS_Recomendacao', 'Comentario'
+        'Nota_Pedido_Embalagem', 'NPS_Recomendacao', 'Comentario'
     ])
 if 'como_conheceu_outro' not in st.session_state:
     st.session_state.como_conheceu_outro = ""
 if 'show_form' not in st.session_state:
     st.session_state.show_form = True
 
-
 # =========================================================
 # INTERFACE DO FORMULÁRIO
 # =========================================================
 st.markdown("<h1 style='text-align:center;'>Pesquisa de Satisfação</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós! Leva menos de 40seg.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós! Leva menos de 40 segundos.</p>", unsafe_allow_html=True) 
 st.markdown("---")
 
-# Container para mostrar o formulário ou a mensagem de agradecimento
-form_container = st.container()
-mensagem_container = st.empty()
+form_container = st.empty() 
+mensagem_container = st.empty() 
+
+# Variáveis globais (para o escopo de envio)
+nota_atendimento = 0
+nota_qualidade_sabor = 0
+nota_ambiente_logistica = 0
+nota_pedido_embalagem_delivery = None
+nps_recomendacao = 0
+opcoes_notas = list(range(0, 11))
 
 
 if st.session_state.show_form:
-    with form_container:
+    with form_container.container(): 
         with st.form("pesquisa_form"):
-            # Segmento
+            
+            # 2. SELEÇÃO DO SEGMENTO
             segmento = st.radio(
-                "**Onde foi sua experiência?**",
+                "**Sua compra na Pureto foi?**", 
                 options=["Restaurante (Salão)", "Delivery (Entrega)"],
                 horizontal=True,
-                key='seg_radio' # Chave única
+                key='seg_radio'
             )
             st.markdown("---")
 
-            # Dados pessoais
+            # 1. DADOS DE IDENTIFICAÇÃO (FIXOS)
+            st.subheader("Sobre você")
             col1, col2, col3 = st.columns(3)
             nome = col1.text_input("**Seu nome completo:**", key='nome_input')
             whatsapp = col2.text_input("**Seu WhatsApp:**", key='whats_input')
+            
+            # 🚨 CORREÇÃO DA DATA: Usando .date() para estabilizar o input do Streamlit
             aniversario = col3.date_input(
                 "**Data de aniversário:**",
-                value=datetime.today(),
+                value=datetime.today().date(), 
+                min_value=datetime(1900, 1, 1).date(),
+                max_value=datetime.today().date(),
                 key='aniv_input'
             )
 
-            # Como conheceu
+            # Lógica Como Conheceu
             opcoes_conheceu_base = [
                 "Instagram", "Facebook", "Google", "Indicação de amigo/familiar",
                 "Passando em frente ao restaurante", "Placa na entrada de Schroeder (ponte)",
@@ -86,43 +101,45 @@ if st.session_state.show_form:
                 opcoes_conheceu = ["Já era cliente do salão"] + opcoes_conheceu_base
 
             como_conheceu = st.selectbox(
-                "**Como você nos conheceu?**",
+                "**Como nos conheceu?**",
                 ["Selecione uma opção"] + opcoes_conheceu,
                 key='conheceu_select'
             )
 
             como_outro = ""
             if como_conheceu == "Outro:":
-                como_outro = st.text_input("Como nos conheceu:", key='outro_input')
+                como_outro = st.text_input("Como nos conheceu? (Especifique):", key='outro_input')
             
             st.markdown("---")
 
             # =========================================================
             # PERGUNTAS AVALIATIVAS
             # =========================================================
-            opcoes = list(range(0, 11))
-
+            
             if segmento == "Restaurante (Salão)":
                 st.subheader("🍽️ Avaliação no Salão")
-                nota_atendimento = st.radio("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", opcoes, horizontal=True, key='nota_atendimento_s')
-                nota_qualidade = st.radio("2️⃣ Qualidade e sabor dos pratos:", opcoes, horizontal=True, key='nota_qualidade_s')
-                nota_entrega_ambiente = st.radio("3️⃣ Ambiente e limpeza:", opcoes, horizontal=True, key='nota_ambiente_s')
+                nota_atendimento = st.radio("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", opcoes_notas, horizontal=True, key='nota_atendimento_s')
+                nota_qualidade_sabor = st.radio("2️⃣ Qualidade e sabor dos pratos:", opcoes_notas, horizontal=True, key='nota_qualidade_s')
+                nota_ambiente_logistica = st.radio("3️⃣ Ambiente e limpeza:", opcoes_notas, horizontal=True, key='nota_ambiente_s')
                 
                 # Nulo para Delivery
                 nota_pedido_embalagem_delivery = None 
 
-            else:
+                # Pergunta NPS (4ª pergunta no Salão)
+                nps_recomendacao = st.radio("4️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria a um amigo ou familiar?", opcoes_notas, horizontal=True, key='nps_radio_s')
+
+
+            else: # Delivery (Entrega)
                 st.subheader("🛵 Avaliação do Delivery")
-                nota_atendimento = st.radio("1️⃣ Atendimento e facilidade do pedido:", opcoes, horizontal=True, key='nota_atendimento_d')
+                nota_atendimento = st.radio("1️⃣ Atendimento e facilidade do pedido:", opcoes_notas, horizontal=True, key='nota_atendimento_d')
                 
-                # Mudança de nome de variável para simplificar o armazenamento final
-                nota_pedido_embalagem_delivery = st.radio("2️⃣ Logística (tempo e embalagem):", opcoes, horizontal=True, key='nota_embalagem_d')
+                nota_pedido_embalagem_delivery = st.radio("2️⃣ Logística (tempo e embalagem):", opcoes_notas, horizontal=True, key='nota_embalagem_d')
                 
-                nota_qualidade = st.radio("3️⃣ Qualidade e sabor pós-entrega:", opcoes, horizontal=True, key='nota_qualidade_d')
-                nota_entrega_ambiente = st.radio("4️⃣ Apresentação e cuidado com os itens:", opcoes, horizontal=True, key='nota_ambiente_d')
-            
-            # Pergunta NPS (Numerada corretamente)
-            nps_recomendacao = st.radio("5️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria a um amigo ou familiar?", opcoes, horizontal=True, key='nps_radio')
+                nota_qualidade_sabor = st.radio("3️⃣ Qualidade e sabor pós-entrega:", opcoes_notas, horizontal=True, key='nota_qualidade_d')
+                nota_ambiente_logistica = st.radio("4️⃣ Apresentação e cuidado com os itens:", opcoes_notas, horizontal=True, key='nota_ambiente_d')
+                
+                # Pergunta NPS (5ª pergunta no Delivery)
+                nps_recomendacao = st.radio("5️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria a um amigo ou familiar?", opcoes_notas, horizontal=True, key='nps_radio_d')
             
             st.markdown("---")
 
@@ -135,7 +152,6 @@ if st.session_state.show_form:
             # 🚀 BOTÃO DE ENVIO (OBRIGATÓRIO)
             enviar = st.form_submit_button("Enviar Respostas ✅")
 else:
-    # Se o formulário não for mostrado, o botão de envio deve ser definido como False
     enviar = False
 
 
@@ -143,15 +159,15 @@ else:
 # PROCESSAMENTO DE RESPOSTA
 # =========================================================
 if enviar:
+    # 1. Validação
     if not nome or not whatsapp or como_conheceu == "Selecione uma opção":
         st.error("⚠️ Por favor, preencha Nome, WhatsApp e Como nos conheceu.")
-        # Se falhar na validação, forçamos o formulário a reaparecer
         st.session_state.show_form = True
     else:
-        # Se for Salão, nota_pedido_embalagem_delivery deve ser None (e vice-versa)
-        nota_embalagem_final = nota_pedido_embalagem_delivery if segmento == "Delivery (Entrega)" else None
+        # 2. Processamento e Armazenamento
         
-        aniversario_str = aniversario.strftime("%d/%m/%Y")
+        # 🚨 FORMATO DE DATA: Garantido DD/MM/AAAA no output
+        aniversario_str = aniversario.strftime("%d/%m/%Y") 
         como_final = como_outro if como_conheceu == "Outro:" else como_conheceu
 
         nova = pd.DataFrame([{
@@ -162,22 +178,22 @@ if enviar:
             "Como_Conheceu": como_final,
             "Segmento": segmento,
             "Nota_Atendimento": nota_atendimento,
-            "Nota_Qualidade_Sabor": nota_qualidade,
-            "Nota_Entrega_Ambiente": nota_entrega_ambiente,
-            "Nota_Pedido_Embalagem": nota_embalagem_final, # Armazena corretamente
+            "Nota_Qualidade_Sabor": nota_qualidade_sabor,
+            "Nota_Entrega_Ambiente": nota_ambiente_logistica,
+            "Nota_Pedido_Embalagem": nota_pedido_embalagem_delivery,
             "NPS_Recomendacao": nps_recomendacao,
             "Comentario": comentario
         }])
         
-        # Armazena no Session State
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
         
-        # Oculta o formulário e mostra a mensagem de sucesso
+        # 3. Exibição das Mensagens e Agradecimento
+        
         st.session_state.show_form = False
         form_container.empty()
         
         with mensagem_container:
-            # ✅ Mensagem padrão
+            # ✅ Mensagem padrão (Cupom)
             st.success("✅ Pesquisa enviada com sucesso!")
             st.markdown(
                 f"""
@@ -190,14 +206,15 @@ if enviar:
                 """, unsafe_allow_html=True
             )
 
-            # ⭐ Mensagem condicional
+            # ⭐ Mensagem condicional (Google + Entrega Grátis)
             if nps_recomendacao > 8:
                 st.balloons()
                 st.markdown(
                     f"""
                     <div style='background-color:#fff3cd; color:#856404; padding:20px; border-radius:10px; margin-top:25px;'>
-                        <h4>🌟 {nome}, já que você nos avaliou tão bem, gostaríamos de pedir uma última ajuda!</h4>
-                        <p>Seria incrível se você pudesse deixar uma avaliação rápida no Google sobre sua experiência. Isso nos ajuda demais!</p>
+                        <h4 style='font-weight:bold; color:#856404;'>Google <span style='font-size:1.5em;'>⭐⭐⭐⭐⭐</span></h4>
+                        <p>{nome}, e que tal compartilhá-la essa sua incrível opinião lá no Google com um comentário positivo? Isso nos ajuda muito! 🙏</p>
+                        <p style='font-weight:bold;'>Como gratidão por essa parte, sua próxima entrega é grátis.</p>
                         <a href='{GOOGLE_REVIEW_LINK}' target='_blank'
                         style='background-color:#f0ad4e; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;'>
                             💬 Avaliar no Google
@@ -207,15 +224,14 @@ if enviar:
                 )
             
             st.markdown("---")
+            st.info("✅ Suas respostas foram registradas com sucesso. Obrigado por contribuir!")
 
 
 # =========================================================
 # ÁREA ADMINISTRATIVA (ACESSO VIA URL SECRETA)
 # =========================================================
-# Acessível via: SEU_APP_URL/?admin=SUA_SENHA_SECRETA
 ADMIN_KEY = 'admin'
-ADMIN_PASSWORD = 'pureto2025' # Sua senha secreta
-
+ADMIN_PASSWORD = 'pureto2025' 
 query_params = st.query_params
 
 if ADMIN_KEY in query_params and query_params[ADMIN_KEY] == ADMIN_PASSWORD:
