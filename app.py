@@ -10,8 +10,11 @@ from google.oauth2.service_account import Credentials
 st.set_page_config(page_title="Pesquisa de Satisfação — Pureto", layout="wide")
 GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
 
-# Definir o escopo de permissões
-scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+# Definir o escopo de permissões (COM A CORREÇÃO)
+scopes = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file"
+]
 creds = Credentials.from_service_account_info(
     st.secrets["gcp_service_account"], scopes=scopes
 )
@@ -34,7 +37,6 @@ def read_data():
 
 def write_data(df_row):
     """Escreve uma nova linha de dados na planilha."""
-    # Transforma o DataFrame de uma linha em uma lista de valores
     values = df_row.values.tolist()[0]
     worksheet.append_row(values, value_input_option="USER_ENTERED")
 
@@ -160,7 +162,6 @@ else:
 
                 aniversario_str = aniversario.strftime("%d/%m/%Y")
                 
-                # Criar um DataFrame de uma linha para ser salvo
                 nova_resposta_df = pd.DataFrame([{
                     "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Nome": nome, "Whatsapp": whatsapp,
                     "Aniversario": aniversario_str, "Como_Conheceu": como_conheceu_final, "Segmento": segmento,
