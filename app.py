@@ -28,7 +28,7 @@ def calcular_nps(df):
     return nps_score, perc_prom, perc_neut, perc_det, total
 
 # =========================================================
-# ESTADOS INICIAIS (ARMAZENAMENTO TEMPORÁRIO)
+# ESTADOS INICIAIS
 # =========================================================
 if 'respostas' not in st.session_state:
     st.session_state.respostas = pd.DataFrame(columns=[
@@ -36,7 +36,9 @@ if 'respostas' not in st.session_state:
         'Nota_Atendimento', 'Nota_Qualidade_Sabor', 'Nota_Entrega_Ambiente',
         'Nota_Pedido_Embalagem', 'NPS_Recomendacao', 'Comentario'
     ])
-# O estado 'show_form' é desnecessário com o método de st.rerun()
+# Usamos esta variável para exibir o campo de texto 'Outro'
+if 'como_conheceu_outro_temp' not in st.session_state:
+    st.session_state.como_conheceu_outro_temp = ""
 
 # =========================================================
 # INTERFACE DO FORMULÁRIO
@@ -45,18 +47,20 @@ st.markdown("<h1 style='text-align:center;'>Pesquisa de Satisfação</h1>", unsa
 st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós! Leva menos de 40 segundos.</p>", unsafe_allow_html=True) 
 st.markdown("---")
 
+# Variáveis globais para as notas (necessário para o escopo do if enviar)
+nota_atendimento = 0
+nota_qualidade_sabor = 0
+nota_ambiente_logistica = 0
+nota_pedido_embalagem_delivery = None # Mantém None como default para Salão
+nps_recomendacao = 0
 opcoes_notas = list(range(0, 11))
 
-# Variáveis para a lógica de 'Outro:'
-if 'como_conheceu_outro_temp' not in st.session_state:
-    st.session_state.como_conheceu_outro_temp = ""
 
-# --- INÍCIO DO FORMULÁRIO (Será re-renderizado após o envio) ---
 with st.form("pesquisa_form"):
     
     # 2. SELEÇÃO DO SEGMENTO
     segmento = st.radio(
-        "**Sua compra na Pureto foi?**",
+        "**Sua compra na Pureto foi?**", 
         options=["Restaurante (Salão)", "Delivery (Entrega)"],
         horizontal=True,
         key='seg_radio'
@@ -69,7 +73,7 @@ with st.form("pesquisa_form"):
     nome = col1.text_input("**Seu nome completo:**", key='nome_input')
     whatsapp = col2.text_input("**Seu WhatsApp:**", key='whats_input')
     
-    # 🚨 CORREÇÃO DA DATA: Usando .date() para estabilizar. Formato DD/MM/AAAA GARANTIDO no salvamento.
+    # Data de Aniversário (Formatado na saída, mas o widget exibe conforme o local do Streamlit Cloud)
     aniversario = col3.date_input(
         "**Data de aniversário (DD/MM/AAAA):**",
         value=datetime.today().date(), 
@@ -95,7 +99,7 @@ with st.form("pesquisa_form"):
         key='conheceu_select'
     )
 
-    # 🚨 CORREÇÃO LÓGICA "OUTRO:": Usando um container vazio para exibir
+    # 🚨 CORREÇÃO LÓGICA "OUTRO:" (Exibe o campo de texto condicionalmente)
     if como_conheceu == "Outro:":
         st.session_state.como_conheceu_outro_temp = st.text_input("Como nos conheceu? (Especifique):", key='outro_input')
     else:
@@ -104,7 +108,7 @@ with st.form("pesquisa_form"):
     st.markdown("---")
 
     # =========================================================
-    # PERGUNTAS AVALIATIVAS
+    # PERGUNTAS AVALIATIVAS (Lógica de exibição CORRIGIDA)
     # =========================================================
     
     if segmento == "Restaurante (Salão)":
@@ -113,18 +117,20 @@ with st.form("pesquisa_form"):
         nota_qualidade_sabor = st.radio("2️⃣ Qualidade e sabor dos pratos:", opcoes_notas, horizontal=True, key='nota_qualidade_s')
         nota_ambiente_logistica = st.radio("3️⃣ Ambiente e limpeza:", opcoes_notas, horizontal=True, key='nota_ambiente_s')
         
-        nota_pedido_embalagem_delivery = None 
+        # NPS (4ª pergunta no Salão)
         nps_recomendacao = st.radio("4️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria a um amigo ou familiar?", opcoes_notas, horizontal=True, key='nps_radio_s')
 
     else: # Delivery (Entrega)
         st.subheader("🛵 Avaliação do Delivery")
         nota_atendimento = st.radio("1️⃣ Atendimento e facilidade do pedido:", opcoes_notas, horizontal=True, key='nota_atendimento_d')
         
+        # Nota que vai para o campo Nota_Pedido_Embalagem
         nota_pedido_embalagem_delivery = st.radio("2️⃣ Logística (tempo e embalagem):", opcoes_notas, horizontal=True, key='nota_embalagem_d')
         
         nota_qualidade_sabor = st.radio("3️⃣ Qualidade e sabor pós-entrega:", opcoes_notas, horizontal=True, key='nota_qualidade_d')
         nota_ambiente_logistica = st.radio("4️⃣ Apresentação e cuidado com os itens:", opcoes_notas, horizontal=True, key='nota_ambiente_d')
         
+        # NPS (5ª pergunta no Delivery)
         nps_recomendacao = st.radio("5️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria a um amigo ou familiar?", opcoes_notas, horizontal=True, key='nps_radio_d')
     
     st.markdown("---")
@@ -144,11 +150,10 @@ if enviar:
     # 1. Validação
     if not nome or not whatsapp or como_conheceu == "Selecione uma opção":
         st.error("⚠️ Por favor, preencha Nome, WhatsApp e Como nos conheceu.")
-        # Se falhar na validação, o script continua a rodar, mantendo o formulário visível com o erro
+        # O formulário permanece visível
     else:
         # 2. Processamento e Armazenamento
         
-        # 🚨 FORMATO DE DATA: Garantido DD/MM/AAAA no output
         aniversario_str = aniversario.strftime("%d/%m/%Y") 
         como_final = st.session_state.como_conheceu_outro_temp if como_conheceu == "Outro:" else como_conheceu
 
@@ -169,10 +174,9 @@ if enviar:
         
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
         
-        # 3. Exibição das Mensagens e Agradecimento
+        # 3. Exibição das Mensagens e Agradecimento (AGORA DENTRO DO IF ENVIAR)
         
-        # Oculta o formulário principal e mostra as mensagens no topo
-        st.empty() # Limpa o container vazio
+        # --- Mensagens de Sucesso ---
         
         st.success("✅ Pesquisa enviada com sucesso!")
         
