@@ -10,42 +10,54 @@ st.set_page_config(page_title="Pesquisa de Satisfação - Pureto Sushi", layout=
 GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
 
 ADMIN_KEY = "admin"            # parâmetro na URL
-ADMIN_PASSWORD = "pureto2025"  # valor esperado na URL (ex: ?admin=pureto2025)
+ADMIN_PASSWORD = "pureto2025"  # valor esperado na URL (ex.: ?admin=pureto2025)
 
 # =========================================================
 # FUNÇÕES AUXILIARES
 # =========================================================
 def calcular_nps(df: pd.DataFrame):
-    """
-    Retorna: (nps_score, %promotores, %neutros, %detratores, total)
-    """
     if df.empty or "NPS_Recomendacao" not in df.columns:
         return 0.0, 0.0, 0.0, 0.0, 0
-
     total = len(df)
     promotores = (df["NPS_Recomendacao"] >= 9).sum()
     detratores = (df["NPS_Recomendacao"] <= 6).sum()
-
     perc_prom = (promotores / total) * 100
     perc_det = (detratores / total) * 100
     perc_neut = 100 - perc_prom - perc_det
     nps_score = perc_prom - perc_det
     return nps_score, perc_prom, perc_neut, perc_det, total
 
-
 @st.cache_data
 def to_csv_bytes(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
 
-
 def valida_data_ddmmaa(texto: str) -> str:
-    """
-    Valida e retorna a data no formato DD/MM/AAAA.
-    Lança ValueError se inválida.
-    """
+    """Valida e retorna a data no formato DD/MM/AAAA. Lança ValueError se inválida."""
     data = datetime.strptime(texto.strip(), "%d/%m/%Y")
     return data.strftime("%d/%m/%Y")
 
+# ---- Máscara automática para o campo de data (insere "/" ao digitar) ----
+def mask_aniversario():
+    raw = st.session_state.get("aniversario_txt", "")
+    digits = "".join(ch for ch in raw if ch.isdigit())[:8]  # limita a 8 números (DDMMAAAA)
+
+    out = ""
+    if len(digits) >= 2:
+        out = digits[:2] + "/"
+    else:
+        out = digits
+
+    if len(digits) >= 4:
+        out += digits[2:4] + "/"
+    elif len(digits) > 2:
+        out += digits[2:]
+
+    if len(digits) > 4:
+        out += digits[4:]
+
+    # Evita piscar se já está igual
+    if st.session_state["aniversario_txt"] != out:
+        st.session_state["aniversario_txt"] = out
 
 # =========================================================
 # ESTADO INICIAL (BANCO EM MEMÓRIA)
@@ -87,15 +99,25 @@ with st.form("pesquisa_form", clear_on_submit=False):
         "**Sua compra na Pureto foi?**",
         options=["Restaurante (Salão)", "Delivery (Entrega)"],
         horizontal=True,
+        key="seg_radio",
     )
     st.markdown("---")
 
     # Dados pessoais
     st.subheader("Sobre você")
     col1, col2, col3 = st.columns(3)
-    nome = col1.text_input("**Seu nome completo:**")
-    whatsapp = col2.text_input("**Seu WhatsApp:**")
-    aniversario_txt = col3.text_input("**Data de aniversário (DD/MM/AAAA):**", placeholder="Ex: 25/12/1990")
+    nome = col1.text_input("**Seu nome completo:**", key="nome_input")
+    whatsapp = col2.text_input("**Seu WhatsApp:**", key="whats_input")
+
+    # Campo de data com MÁSCARA automática (on_change -> insere "/")
+    if "aniversario_txt" not in st.session_state:
+        st.session_state["aniversario_txt"] = ""
+    col3.text_input(
+        "**Data de aniversário (DD/MM/AAAA):**",
+        key="aniversario_txt",
+        placeholder="Ex: 25/12/1990",
+        on_change=mask_aniversario,
+    )
 
     st.markdown("---")
 
@@ -125,16 +147,16 @@ with st.form("pesquisa_form", clear_on_submit=False):
             "Outro:",
         ]
 
-    como_conheceu = st.selectbox("**Como nos conheceu?**", opcoes_conheceu)
+    como_conheceu = st.selectbox("**Como nos conheceu?**", opcoes_conheceu, key="conheceu_select")
 
     # Campo "Outro" — SOMENTE quando "Outro:" for selecionado
     como_conheceu_outro = ""
     if como_conheceu == "Outro:":
-        como_conheceu_outro = st.text_input("Como nos conheceu? (Especifique):")
+        como_conheceu_outro = st.text_input("Como nos conheceu? (Especifique):", key="como_outro_input")
 
     st.markdown("---")
 
-    # Perguntas (0 a 10)
+    # Perguntas (0 a 10) — com chaves distintas por segmento para não “vazar”
     opcoes_notas = list(range(0, 11))
 
     if segmento == "Restaurante (Salão)":
@@ -202,6 +224,7 @@ with st.form("pesquisa_form", clear_on_submit=False):
     comentario = st.text_area(
         "💬 Comentários, sugestões, elogios ou reclamações (opcional):",
         max_chars=500,
+        key="comentario_input",
     )
 
     enviar = st.form_submit_button("Enviar Respostas ✅")
@@ -217,9 +240,9 @@ if enviar:
 
     # Valida/normaliza data (opcional, mas se preenchida precisa ser válida)
     aniversario_fmt = ""
-    if aniversario_txt.strip():
+    if st.session_state["aniversario_txt"].strip():
         try:
-            aniversario_fmt = valida_data_ddmmaa(aniversario_txt)
+            aniversario_fmt = valida_data_ddmmaa(st.session_state["aniversario_txt"])
         except ValueError:
             st.warning("⚠️ Data inválida. Use o formato DD/MM/AAAA (ex: 14/10/2025).")
             st.stop()
@@ -249,7 +272,7 @@ if enviar:
 
     st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
-    # Mensagens de agradecimento
+    # Mensagens de agradecimento (agora aparecem sempre que envia)
     st.success("✅ Pesquisa enviada com sucesso!")
     st.markdown(
         f"""
@@ -299,7 +322,6 @@ if ADMIN_KEY in query and query[ADMIN_KEY] == ADMIN_PASSWORD:
         st.warning("Ainda não há respostas registradas.")
     else:
         nps_score, prom, neut, det, total_calc = calcular_nps(df)
-
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("NPS", f"{nps_score:.1f}")
         c2.metric("Promotores (%)", f"{prom:.1f}")
