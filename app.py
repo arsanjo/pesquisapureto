@@ -68,6 +68,9 @@ else:
     st.title("Pesquisa de Satisfação")
     st.markdown("Sua opinião é muito importante para nós! Leva menos de 1 minuto.")
 
+    # -- WIDGETS INTERATIVOS FORA DO FORMULÁRIO PARA REAÇÃO EM TEMPO REAL --
+
+    # 1. Seletor de Segmento
     segmento = st.radio(
         "Primeiro, conte pra gente: onde foi sua experiência?",
         ["Restaurante (Salão)", "Delivery (Entrega)"],
@@ -75,7 +78,28 @@ else:
         key="segmento_selecionado"
     )
 
+    # 2. Seletor de "Como conheceu"
+    como_conheceu = st.selectbox(
+        "Como você conheceu o Pureto?",
+        ["Instagram", "Facebook", "Google", "Indicação de amigo ou familiar",
+         "Já era cliente do Delivery", "Já era cliente do Restaurante", "Outro"],
+        key="como_conheceu_select"
+    )
+    
+    # 3. Campo de texto que aparece SOMENTE se "Outro" for selecionado
+    como_conheceu_outro = ""
+    if como_conheceu == "Outro":
+        como_conheceu_outro = st.text_input(
+            "Por favor, especifique como nos conheceu:",
+            placeholder="Ex: Vi a fachada, Anúncio no rádio, etc.",
+            key="como_conheceu_outro_text"
+        )
+    
+    st.markdown("---") # Separador visual
+
+    # -- FORMULÁRIO APENAS PARA OS CAMPOS A SEREM ENVIADOS JUNTOS --
     with st.form("formulario_cliente"):
+        st.subheader("Conte-nos um pouco sobre você")
         col1, col2, col3 = st.columns([2, 2, 1])
         nome = col1.text_input("Seu Nome Completo:")
         whatsapp = col2.text_input("Seu WhatsApp (com DDD):")
@@ -89,29 +113,16 @@ else:
             max_value=today,
             format="DD/MM/YYYY"
         )
-
-        como_conheceu = st.selectbox(
-            "Como você conheceu o Pureto?",
-            ["Instagram", "Facebook", "Google", "Indicação de amigo ou familiar",
-             "Já era cliente do Delivery", "Já era cliente do Restaurante", "Outro"]
-        )
         
-        # CORREÇÃO: Campo de texto condicional para "Outro"
-        como_conheceu_outro = ""
-        if como_conheceu == "Outro":
-            como_conheceu_outro = st.text_input(
-                "Por favor, especifique como nos conheceu:",
-                placeholder="Ex: Vi a fachada, Anúncio no rádio, etc."
-            )
-
         st.markdown("---")
 
+        # As perguntas de avaliação aparecem aqui dentro, baseadas na seleção feita lá fora
         if segmento == "Restaurante (Salão)":
             st.subheader("🍽️ Avaliação no Salão")
-            nota1 = st.radio("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", list(range(11)), horizontal=True, key="nota1_salao")
+            nota1 = st.radio("1️⃣ Atendimento da equipe:", list(range(11)), horizontal=True, key="nota1_salao")
             nota2 = st.radio("2️⃣ Qualidade e sabor dos pratos:", list(range(11)), horizontal=True, key="nota2_salao")
             nota3 = st.radio("3️⃣ Limpeza e conforto do ambiente:", list(range(11)), horizontal=True, key="nota3_salao")
-            nota4 = st.radio("4️⃣ O quanto você nos recomendaria a um amigo ou familiar?", list(range(11)), horizontal=True, key="nps_salao")
+            nota4 = st.radio("4️⃣ O quanto você nos recomendaria?", list(range(11)), horizontal=True, key="nps_salao")
             nota5 = None
             nps = nota4
 
@@ -119,13 +130,13 @@ else:
             st.subheader("🛵 Avaliação do Delivery")
             nota1 = st.radio("1️⃣ Facilidade e atendimento no pedido:", list(range(11)), horizontal=True, key="nota1_delivery")
             nota2 = st.radio("2️⃣ Rapidez da entrega:", list(range(11)), horizontal=True, key="nota2_delivery")
-            nota3 = st.radio("3️⃣ Qualidade e sabor dos pratos entregues:", list(range(11)), horizontal=True, key="nota3_delivery")
+            nota3 = st.radio("3️⃣ Qualidade e sabor dos pratos:", list(range(11)), horizontal=True, key="nota3_delivery")
             nota4 = st.radio("4️⃣ Condição da embalagem ao chegar:", list(range(11)), horizontal=True, key="nota4_delivery")
-            nota5 = st.radio("5️⃣ O quanto você nos recomendaria a um amigo ou familiar?", list(range(11)), horizontal=True, key="nps_delivery")
+            nota5 = st.radio("5️⃣ O quanto você nos recomendaria?", list(range(11)), horizontal=True, key="nps_delivery")
             nps = nota5
 
         st.markdown("---")
-        comentario = st.text_area("Comentários, sugestões, elogios ou reclamações (opcional):", max_chars=500)
+        comentario = st.text_area("Comentários, sugestões ou elogios (opcional):", max_chars=500)
         
         submit = st.form_submit_button("Enviar Respostas")
 
