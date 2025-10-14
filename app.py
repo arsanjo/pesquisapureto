@@ -12,14 +12,12 @@ GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
 # ============================================================
 # INICIALIZAÇÃO DE ESTADOS
 # ============================================================
+# Inicializa o DataFrame para armazenar as respostas, se ainda não existir
 if "respostas" not in st.session_state:
     st.session_state.respostas = pd.DataFrame(columns=[
         "Data", "Nome", "Whatsapp", "Aniversario", "Como_Conheceu",
         "Segmento", "Nota1", "Nota2", "Nota3", "Nota4", "Nota5", "NPS", "Comentario"
     ])
-
-if "ultimo_segmento" not in st.session_state:
-    st.session_state.ultimo_segmento = None
 
 # ============================================================
 # FUNÇÃO DE CÁLCULO NPS
@@ -42,14 +40,24 @@ def calcular_nps(df):
 st.title("Pesquisa de Satisfação")
 st.markdown("Sua opinião é muito importante para nós! Leva menos de 1 minuto.")
 
+# --- MUDANÇA PRINCIPAL: SELETOR DE SEGMENTO FORA DO FORMULÁRIO ---
+# Este widget agora fica fora do form para permitir o recarregamento automático da página
+segmento = st.radio(
+    "Primeiro, conte pra gente: onde foi sua experiência?",
+    ["Restaurante (Salão)", "Delivery (Entrega)"],
+    horizontal=True,
+    key="segmento_selecionado" # Usar uma chave para manter o estado
+)
+
+# O formulário começa DEPOIS da seleção de segmento
 with st.form("formulario"):
+    # Os campos de dados pessoais continuam no formulário
     col1, col2, col3 = st.columns([2, 2, 1])
     nome = col1.text_input("Seu Nome Completo:")
     whatsapp = col2.text_input("Seu WhatsApp:")
-    aniversario = col3.date_input("Data de Aniversário:", value=datetime.today(),
+    aniversario = col3.date_input("Data de Aniversário:", value=None, # Melhor iniciar como None
                                   format="DD/MM/YYYY")
 
-    segmento = st.radio("Onde foi sua experiência?", ["Restaurante (Salão)", "Delivery (Entrega)"], horizontal=True)
     como_conheceu = st.selectbox(
         "Como você conheceu o Pureto?",
         ["Instagram", "Facebook", "Google", "Indicação de amigo ou familiar",
@@ -59,43 +67,43 @@ with st.form("formulario"):
     st.markdown("---")
 
     # ============================================================
-    # PERGUNTAS DINÂMICAS (corrigido)
+    # PERGUNTAS DINÂMICAS (AGORA FUNCIONA AUTOMATICAMENTE)
     # ============================================================
-    if "ultimo_segmento" not in st.session_state or st.session_state.ultimo_segmento != segmento:
-        for k in ["nota1", "nota2", "nota3", "nota4", "nota5"]:
-            if k in st.session_state:
-                del st.session_state[k]
-        st.session_state.ultimo_segmento = segmento
-        st.rerun()
-
+    # O bloco if/elif agora funciona porque a variável 'segmento' é atualizada instantaneamente
     if segmento == "Restaurante (Salão)":
         st.subheader("🍽️ Avaliação no Salão")
-        nota1 = st.radio("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", list(range(11)), key="nota1", horizontal=True)
-        nota2 = st.radio("2️⃣ Qualidade e sabor dos pratos:", list(range(11)), key="nota2", horizontal=True)
-        nota3 = st.radio("3️⃣ Limpeza e conforto do ambiente:", list(range(11)), key="nota3", horizontal=True)
-        nota4 = st.radio("4️⃣ O quanto você nos recomendaria a um amigo ou familiar?", list(range(11)), key="nota4", horizontal=True)
-        nota5 = None
+        # Usamos `st.slider` que é mais visual para notas de 0 a 10
+        nota1 = st.slider("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", 0, 10, key="nota1_salao")
+        nota2 = st.slider("2️⃣ Qualidade e sabor dos pratos:", 0, 10, key="nota2_salao")
+        nota3 = st.slider("3️⃣ Limpeza e conforto do ambiente:", 0, 10, key="nota3_salao")
+        nota4 = st.slider("4️⃣ O quanto você nos recomendaria a um amigo ou familiar?", 0, 10, key="nota4_salao")
+        nota5 = None  # Não há quinta nota para o salão
         nps = nota4
 
     elif segmento == "Delivery (Entrega)":
         st.subheader("🚗 Avaliação do Delivery")
-        nota1 = st.radio("1️⃣ Facilidade e atendimento no pedido:", list(range(11)), key="nota1", horizontal=True)
-        nota2 = st.radio("2️⃣ Rapidez da entrega:", list(range(11)), key="nota2", horizontal=True)
-        nota3 = st.radio("3️⃣ Qualidade e sabor dos pratos entregues:", list(range(11)), key="nota3", horizontal=True)
-        nota4 = st.radio("4️⃣ Condição da embalagem ao chegar:", list(range(11)), key="nota4", horizontal=True)
-        nota5 = st.radio("5️⃣ O quanto você nos recomendaria a um amigo ou familiar?", list(range(11)), key="nota5", horizontal=True)
+        # Usamos `st.slider` aqui também
+        nota1 = st.slider("1️⃣ Facilidade e atendimento no pedido:", 0, 10, key="nota1_delivery")
+        nota2 = st.slider("2️⃣ Rapidez da entrega:", 0, 10, key="nota2_delivery")
+        nota3 = st.slider("3️⃣ Qualidade e sabor dos pratos entregues:", 0, 10, key="nota3_delivery")
+        nota4 = st.slider("4️⃣ Condição da embalagem ao chegar:", 0, 10, key="nota4_delivery")
+        nota5 = st.slider("5️⃣ O quanto você nos recomendaria a um amigo ou familiar?", 0, 10, key="nota5_delivery")
         nps = nota5
 
     st.markdown("---")
     comentario = st.text_area("Comentários, sugestões, elogios ou reclamações (opcional):", max_chars=500)
+    
+    # O botão de envio permanece no final do formulário
     submit = st.form_submit_button("Enviar Respostas")
 
 # ============================================================
-# ENVIO E FEEDBACK
+# ENVIO E FEEDBACK (Lógica permanece a mesma)
 # ============================================================
 if submit:
     if not nome:
         st.error("Por favor, preencha seu nome.")
+    elif not aniversario:
+        st.error("Por favor, preencha sua data de aniversário.")
     else:
         aniversario_str = aniversario.strftime("%d/%m/%Y")
         nova_resposta = pd.DataFrame({
@@ -104,7 +112,7 @@ if submit:
             "Whatsapp": [whatsapp],
             "Aniversario": [aniversario_str],
             "Como_Conheceu": [como_conheceu],
-            "Segmento": [segmento],
+            "Segmento": [segmento], # A variável 'segmento' vem de fora do form
             "Nota1": [nota1],
             "Nota2": [nota2],
             "Nota3": [nota3],
@@ -115,7 +123,6 @@ if submit:
         })
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova_resposta], ignore_index=True)
 
-        # Mensagem geral
         st.success(f"{nome}, muito obrigado pelas suas respostas sinceras!")
         st.markdown("""
         <div style='background-color:#e8f5e9;padding:20px;border-radius:10px;'>
@@ -136,7 +143,7 @@ if submit:
             """, unsafe_allow_html=True)
 
 # ============================================================
-# PAINEL ADMINISTRATIVO (ACESSO SECRETO)
+# PAINEL ADMINISTRATIVO (Lógica permanece a mesma)
 # ============================================================
 query_params = st.query_params
 if "admin" in query_params and query_params["admin"] == "1":
@@ -157,7 +164,7 @@ if "admin" in query_params and query_params["admin"] == "1":
         st.error("Senha incorreta.")
 
 # ============================================================
-# RODAPÉ
+# RODAPÉ (Lógica permanece a mesma)
 # ============================================================
 st.markdown("""
 <hr>
