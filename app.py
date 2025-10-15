@@ -96,6 +96,7 @@ else:
     with st.form("pesquisa_form"):
         st.subheader("Sobre você")
         col1, col2, col3 = st.columns(3)
+        # Campos de texto dentro do form NÃO SÃO resetados no session state
         nome = col1.text_input("Seu nome completo:", key="nome_input_form")
         whatsapp = col2.text_input("Seu WhatsApp:", key="whatsapp_input_form")
         
@@ -128,7 +129,7 @@ else:
             nota_ambiente = st.radio("4️⃣ Apresentação e cuidado com os itens:", opcoes, horizontal=True, key="nota_ambiente_d")
             nps = st.radio("5️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria?", opcoes, horizontal=True, key="nps_d")
 
-        comentario = st.text_area("💬 Comentários, sugestões, elogios ou reclamações (opcional):", max_chars=500)
+        comentario = st.text_area("💬 Comentários, sugestões, elogios ou reclamações (opcional):", max_chars=500, key="comentario_input_form")
         submit = st.form_submit_button("Enviar Respostas ✅")
 
 
@@ -201,17 +202,15 @@ elif submit:
         }])
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
-        # 🚨 CORREÇÃO: Resetar o estado dos campos antes do rerun
-        st.session_state['aniversario_raw_value'] = "" 
-        st.session_state['como_outro_input_value'] = "" 
+        # 🚨 CORREÇÃO PRINCIPAL: Resetar o estado dos campos antes do rerun
+        # Reset de campos FORA do form:
+        st.session_state['aniversario_raw_value'] = "" # Reset Data Input (fora do form)
+        st.session_state['como_outro_input_value'] = "" # Reset Campo "Outro" (fora do form)
         
-        # Para forçar o reset do selectbox para "Selecione uma opção",
-        # precisamos resetar o próprio key do widget para o valor inicial do índice 0.
-        # O valor do selectbox é resetado automaticamente pelo rerun se o state não for forçado.
-        # Por segurança, limpamos os outros campos text input do formulário principal:
+        # Reset de campos DENTRO do form: Resetando o valor de entrada (que o Streamlit permite)
         st.session_state['nome_input_form'] = ""
         st.session_state['whatsapp_input_form'] = ""
-
+        st.session_state['comentario_input_form'] = "" # Reset do comentário também
 
         # 2. Redirecionamento para a página de sucesso (com parâmetros)
         params = st.query_params.to_dict()
