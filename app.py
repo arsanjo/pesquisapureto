@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import matplotlib.pyplot as plt
+import altair as alt  # ✅ usamos Altair para gráficos, já incluído no Streamlit
 
 # ============================================================
 # CONFIGURAÇÕES INICIAIS
@@ -77,6 +77,7 @@ if admin_mode:
     else:
         # Conversões seguras
         df["NPS_Recomendacao"] = pd.to_numeric(df["NPS_Recomendacao"], errors="coerce").fillna(0).astype(int)
+
         # Resumos
         nps_geral, prom_g, neut_g, det_g, total = calcular_nps(df)
         df_salao = df[df["Segmento"] == "Restaurante (Salão)"]
@@ -94,28 +95,44 @@ if admin_mode:
         st.markdown("---")
         st.markdown("### 📈 NPS por experiência")
 
-        # Gráfico de barras: NPS Geral x Salão x Delivery
-        fig_bar, ax = plt.subplots()
-        categorias = ["Geral", "Salão", "Delivery"]
-        valores = [nps_geral, nps_salao, nps_delivery]
-        ax.bar(categorias, valores)
-        ax.set_ylim(-100, 100)
-        ax.set_ylabel("NPS")
-        ax.set_title("Comparativo de NPS")
-        for i, v in enumerate(valores):
-            ax.text(i, v + (2 if v >= 0 else -6), f"{v:.1f}", ha="center", va="bottom" if v>=0 else "top")
-        st.pyplot(fig_bar)
+        # ---------- Gráfico de barras (Altair): NPS Geral x Salão x Delivery ----------
+        nps_df = pd.DataFrame({
+            "Categoria": ["Geral", "Salão", "Delivery"],
+            "NPS": [round(nps_geral, 1), round(nps_salao, 1), round(nps_delivery, 1)]
+        })
+        bar = (
+            alt.Chart(nps_df)
+            .mark_bar()
+            .encode(x=alt.X("Categoria:N", title=""), y=alt.Y("NPS:Q", scale=alt.Scale(domain=[-100, 100])))
+            .properties(height=320)
+        )
+        labels = (
+            alt.Chart(nps_df)
+            .mark_text(dy=-10)
+            .encode(x="Categoria:N", y="NPS:Q", text=alt.Text("NPS:Q"))
+        )
+        st.altair_chart(bar + labels, use_container_width=True)
 
-        # Gráfico de pizza: proporção Salão vs Delivery
+        # ---------- Gráfico de pizza (Altair): proporção Salão vs Delivery ----------
         st.markdown("### 🥧 Distribuição de experiências")
-        fig_pie, ax2 = plt.subplots()
-        sizes = [len(df_salao), len(df_delivery)]
-        labels = ["Salão", "Delivery"]
-        if sum(sizes) == 0:
-            sizes = [1, 0]  # evita erro de pizza vazia
-        ax2.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90)
-        ax2.axis("equal")
-        st.pyplot(fig_pie)
+        dist_df = pd.DataFrame({
+            "Experiência": ["Salão", "Delivery"],
+            "Quantidade": [len(df_salao), len(df_delivery)]
+        })
+        if dist_df["Quantidade"].sum() == 0:
+            dist_df.loc[0, "Quantidade"] = 1  # evita erro com pizza vazia
+
+        pie = (
+            alt.Chart(dist_df)
+            .mark_arc(innerRadius=60)  # donut
+            .encode(
+                theta="Quantidade:Q",
+                color=alt.Color("Experiência:N", legend=alt.Legend(title="Experiência")),
+                tooltip=["Experiência:N", "Quantidade:Q"]
+            )
+            .properties(height=320)
+        )
+        st.altair_chart(pie, use_container_width=True)
 
         st.markdown("---")
         st.markdown("### 🧾 Respostas coletadas")
