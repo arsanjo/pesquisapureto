@@ -7,6 +7,7 @@ from datetime import datetime
 # ============================================================
 st.set_page_config(page_title="Pesquisa de Satisfação - Pureto Sushi", layout="wide")
 GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
+INSTAGRAM_LINK = "https://www.instagram.com/puretosushi"
 ADMIN_KEY = "admin"
 ADMIN_PASSWORD = "pureto2025"
 
@@ -146,7 +147,6 @@ if not st.session_state.submitted:
             }])
             st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
-            # salva para pós-envio
             st.session_state.submitted = True
             st.session_state.ultimo_nome = nome
             st.session_state.ultimo_nps = nps
@@ -181,6 +181,19 @@ else:
            💬 Avaliar no Google
         </a>
         </div>""", unsafe_allow_html=True)
+
+    # CTA INSTAGRAM (sempre aparece)
+    st.markdown(f"""
+    <div style='background-color:#f5f5f5; color:#222; padding:20px; border-radius:10px; margin-top:30px; text-align:center;'>
+        <p style='font-size:1.1em;'>
+            <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" width="22" style="vertical-align:middle; margin-right:6px;">
+            Siga a <b>Pureto Sushi</b> no Instagram:
+            <a href="{INSTAGRAM_LINK}" target="_blank" style="color:#e1306c; text-decoration:none; font-weight:bold;">
+                @puretosushi
+            </a>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
     st.info("Obrigado por contribuir!")
