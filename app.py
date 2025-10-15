@@ -9,7 +9,7 @@ st.set_page_config(page_title="Pesquisa de Satisfação - Pureto Sushi", layout=
 GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
 ADMIN_KEY = "admin"
 ADMIN_PASSWORD = "pureto2025"
-SUBMIT_KEY = 'pesquisa_enviada' 
+SUBMIT_KEY = 'pesquisa_enviada'
 
 # =========================================================
 # FUNÇÕES
@@ -30,7 +30,6 @@ def calcular_nps(df):
 def to_csv_bytes(df):
     return df.to_csv(index=False).encode("utf-8")
 
-# Função para forçar o formato DD/MM/AAAA na string (para text_input)
 def formatar_data(d):
     digits = "".join(c for c in d if c.isdigit())
     if len(digits) == 8:
@@ -51,7 +50,6 @@ if 'aniversario_raw_value' not in st.session_state:
 if 'como_outro_input_value' not in st.session_state:
     st.session_state.como_outro_input_value = ""
 
-
 # =========================================================
 # TÍTULO E SEGMENTO
 # =========================================================
@@ -63,7 +61,7 @@ segmento = st.radio("**Sua compra na Pureto foi?**", ["Restaurante (Salão)", "D
 st.markdown("---")
 
 # =========================================================
-# LÓGICA "COMO CONHECEU" (FORA DO FORM PARA RENDERIZAÇÃO IMEDIATA)
+# LÓGICA "COMO CONHECEU"
 # =========================================================
 if segmento == "Restaurante (Salão)":
     opcoes_conheceu = [
@@ -76,42 +74,33 @@ else:
         "Indicação de amigo/familiar","Passando em frente ao restaurante","Placa na entrada de Schroeder (ponte)","Outro:"
     ]
 
-# O widget Selectbox (precisa estar fora do form para atualização imediata)
 como_conheceu = st.selectbox("Como nos conheceu?", opcoes_conheceu, key="conheceu_select")
 
-# Campo "Outro:" Condicional
 como_outro = ""
 if como_conheceu == "Outro:":
     como_outro = st.text_input("Como nos conheceu? (Especifique):", value=st.session_state.como_outro_input_value, key="como_outro_input")
 else:
     como_outro = ""
 
-
 # =========================================================
-# FORMULÁRIO (Somente o que precisa ser enviado junto)
+# FORMULÁRIO
 # =========================================================
 if 'submit_status' in st.query_params and st.query_params['submit_status'] == 'success':
-    submit = False 
+    submit = False
 else:
     with st.form("pesquisa_form"):
         st.subheader("Sobre você")
         col1, col2, col3 = st.columns(3)
-        # Campos de texto dentro do form NÃO SÃO resetados no session state
         nome = col1.text_input("Seu nome completo:", key="nome_input_form")
         whatsapp = col2.text_input("Seu WhatsApp:", key="whatsapp_input_form")
-        
-        # Data de aniversário (lê e salva o input no Session State para manter o valor)
         aniversario_raw = col3.text_input("Data de aniversário (DD/MM/AAAA):", value=st.session_state.aniversario_raw_value, placeholder="Ex: 14101972 (apenas números)", key="aniversario_raw_input")
-        st.session_state.aniversario_raw_value = aniversario_raw 
+        st.session_state.aniversario_raw_value = aniversario_raw
         aniversario = formatar_data(aniversario_raw)
 
-        # Visualização simples do Como Conheceu
         st.markdown(f"**Como nos conheceu:** {como_conheceu}{f' (Especificado: {como_outro})' if como_outro else ''}")
-        
         st.markdown("---")
+
         opcoes = list(range(0, 11))
-        
-        # Inicializa as variáveis de nota para o escopo de envio
         nota_atend, nota_sabor, nota_ambiente, nota_embalagem, nps = 0, 0, 0, None, 0
 
         if segmento == "Restaurante (Salão)":
@@ -132,18 +121,14 @@ else:
         comentario = st.text_area("💬 Comentários, sugestões, elogios ou reclamações (opcional):", max_chars=500, key="comentario_input_form")
         submit = st.form_submit_button("Enviar Respostas ✅")
 
-
 # =========================================================
-# PROCESSAMENTO E MENSAGENS 
+# PROCESSAMENTO
 # =========================================================
 if 'submit_status' in st.query_params and st.query_params['submit_status'] == 'success':
-    # Lógica de URL para exibir mensagens de sucesso
     nome_sucesso = st.query_params.get('nome', [''])[0]
     nps_sucesso = int(st.query_params.get('nps', [0])[0])
 
     st.success("✅ Pesquisa enviada com sucesso!")
-    
-    # 1ª Mensagem: Cupom
     st.markdown(f"""
     <div style='background-color:#e8f5e9; color:#1b5e20; padding:20px; border-radius:10px; margin-top:20px;'>
     <h3>🎉 {nome_sucesso}, muito obrigado pelas suas respostas sinceras!</h3>
@@ -153,7 +138,6 @@ if 'submit_status' in st.query_params and st.query_params['submit_status'] == 's
     </div>
     """, unsafe_allow_html=True)
 
-    # 2ª Mensagem: Google + Entrega Grátis
     if nps_sucesso >= 9:
         st.balloons()
         st.markdown(f"""
@@ -166,31 +150,23 @@ if 'submit_status' in st.query_params and st.query_params['submit_status'] == 's
            💬 Avaliar no Google
         </a>
         </div>""", unsafe_allow_html=True)
-    
+
     st.markdown("---")
     st.info("Obrigado por contribuir!")
-    
-    # Limpa o parâmetro de sucesso após exibição para que o formulário apareça na próxima interação
-    st.query_params.pop('submit_status')
-    st.query_params.pop('nome')
-    st.query_params.pop('nps')
-
+    st.experimental_set_query_params()  # limpa parâmetros de sucesso
 
 elif submit:
-    # Lógica de processamento e salvamento
     if not nome or not whatsapp or como_conheceu == "Selecione uma opção":
         st.error("⚠️ Por favor, preencha Nome, WhatsApp e Como nos conheceu.")
     elif aniversario and (aniversario == aniversario_raw or len(aniversario_raw) != 8):
         st.error("⚠️ Data de aniversário inválida. Por favor, use 8 dígitos (DDMMAAAA) ou preencha corretamente.")
     else:
-        # 1. Criação do DataFrame
         como_conheceu_final = como_outro if como_conheceu == "Outro:" else como_conheceu
-        
         nova = pd.DataFrame([{
             "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "Nome": nome,
             "Whatsapp": whatsapp,
-            "Aniversario": aniversario, # Valor já formatado
+            "Aniversario": aniversario,
             "Como_Conheceu": como_conheceu_final,
             "Segmento": segmento,
             "Nota_Atendimento": nota_atend,
@@ -202,29 +178,11 @@ elif submit:
         }])
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
-        # 🚨 CORREÇÃO PRINCIPAL: Resetar o estado dos campos antes do rerun
-        # Reset de campos FORA do form:
-        st.session_state['aniversario_raw_value'] = "" # Reset Data Input (fora do form)
-        st.session_state['como_outro_input_value'] = "" # Reset Campo "Outro" (fora do form)
-        
-        # Reset de campos DENTRO do form: Resetando o valor de entrada (que o Streamlit permite)
-        st.session_state['nome_input_form'] = ""
-        st.session_state['whatsapp_input_form'] = ""
-        st.session_state['comentario_input_form'] = "" # Reset do comentário também
-
-        # 2. Redirecionamento para a página de sucesso (com parâmetros)
-        params = st.query_params.to_dict()
-        params.update({
-            'submit_status': 'success',
-            'nome': nome,
-            'nps': nps
-        })
-        st.query_params.update(params)
+        st.experimental_set_query_params(submit_status="success", nome=nome, nps=nps)
         st.rerun()
 
-
 # =========================================================
-# ADMIN (via URL ?admin=pureto2025)
+# ADMIN
 # =========================================================
 query = st.query_params
 if ADMIN_KEY in query and query[ADMIN_KEY] == ADMIN_PASSWORD:
@@ -236,7 +194,7 @@ if ADMIN_KEY in query and query[ADMIN_KEY] == ADMIN_PASSWORD:
         col_nps, col_total = st.columns(2)
         col_nps.metric("NPS Score", f"{nps_admin:.1f}")
         col_total.metric("Total Respostas", total)
-        
+
         csv = to_csv_bytes(df)
         st.download_button("📥 Baixar Respostas (CSV)", csv, "respostas_pesquisa.csv", "text/csv")
         st.dataframe(df.sort_values(by="Data", ascending=False), use_container_width=True)
