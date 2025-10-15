@@ -9,7 +9,7 @@ st.set_page_config(page_title="Pesquisa de Satisfação - Pureto Sushi", layout=
 GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
 ADMIN_KEY = "admin"
 ADMIN_PASSWORD = "pureto2025"
-SUBMIT_KEY = 'pesquisa_enviada' # Chave secreta para URL de sucesso
+SUBMIT_KEY = 'pesquisa_enviada' 
 
 # =========================================================
 # FUNÇÕES
@@ -46,7 +46,6 @@ if "respostas" not in st.session_state:
         "Nota_Atendimento","Nota_Qualidade_Sabor","Nota_Entrega_Ambiente",
         "Nota_Pedido_Embalagem","NPS_Recomendacao","Comentario"
     ])
-# Inicializa o valor da data para o formulário
 if 'aniversario_raw_value' not in st.session_state:
     st.session_state.aniversario_raw_value = ""
 
@@ -58,7 +57,6 @@ st.markdown("<h1 style='text-align:center;'>Pesquisa de Satisfação</h1>", unsa
 st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós! Leva menos de 40 segundos.</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# 🚨 SEGMENTO FORA DO FORM (OK)
 segmento = st.radio("**Sua compra na Pureto foi?**", ["Restaurante (Salão)", "Delivery (Entrega)"], horizontal=True, key="segmento_selecionado")
 st.markdown("---")
 
@@ -76,23 +74,22 @@ else:
         "Indicação de amigo/familiar","Passando em frente ao restaurante","Placa na entrada de Schroeder (ponte)","Outro:"
     ]
 
-# O widget Selectbox (precisa estar fora do form para atualização imediata)
+# O estado do seletor é mantido pelo índice. Se quisermos resetar, alteramos o st.session_state["conheceu_select"]
+# Usamos index=opcoes_conheceu.index(st.session_state.get('conheceu_select_value', opcoes_conheceu[0])) para manter o valor antes do submit
 como_conheceu = st.selectbox("Como nos conheceu?", opcoes_conheceu, key="conheceu_select")
 
-# 🚨 CORREÇÃO 1: Campo "Outro:" Condicional (Abre imediatamente)
+# Campo "Outro:" Condicional
 como_outro = ""
 if como_conheceu == "Outro:":
     como_outro = st.text_input("Como nos conheceu? (Especifique):", key="como_outro_input")
 else:
-    como_outro = "" # Garante que a variável exista
-
+    como_outro = ""
 
 # =========================================================
 # FORMULÁRIO (Somente o que precisa ser enviado junto)
 # =========================================================
 if 'submit_status' in st.query_params and st.query_params['submit_status'] == 'success':
-    # Se o parâmetro de sucesso estiver na URL, NÃO RENDERIZA O FORMULÁRIO
-    submit = False # Garante que o bloco IF SUBMIT não rode.
+    submit = False 
 else:
     with st.form("pesquisa_form"):
         st.subheader("Sobre você")
@@ -102,10 +99,10 @@ else:
         
         # Data de aniversário (lê e salva o input no Session State para manter o valor)
         aniversario_raw = col3.text_input("Data de aniversário (DD/MM/AAAA):", value=st.session_state.aniversario_raw_value, placeholder="Ex: 14101972 (apenas números)", key="aniversario_raw_input")
-        st.session_state.aniversario_raw_value = aniversario_raw # Atualiza o valor do estado
+        st.session_state.aniversario_raw_value = aniversario_raw 
         aniversario = formatar_data(aniversario_raw)
 
-        # Usamos uma visualização simples do Como Conheceu (sem precisar re-declarar o widget)
+        # Visualização simples do Como Conheceu (sem precisar re-declarar o widget)
         st.markdown(f"**Como nos conheceu:** {como_conheceu}{f' (Especificado: {como_outro})' if como_outro else ''}")
         
         st.markdown("---")
@@ -137,9 +134,7 @@ else:
 # PROCESSAMENTO E MENSAGENS (CORRIGIDO)
 # =========================================================
 if 'submit_status' in st.query_params and st.query_params['submit_status'] == 'success':
-    # 🚨 CORREÇÃO 2: Exibir mensagens após o st.rerun() (lógica de URL)
-    
-    # Recupera os dados da URL (para personalizar a mensagem)
+    # Lógica de URL para exibir mensagens de sucesso (NÃO MEXEMOS AQUI)
     nome_sucesso = st.query_params.get('nome', [''])[0]
     nps_sucesso = int(st.query_params.get('nps', [0])[0])
 
@@ -171,6 +166,12 @@ if 'submit_status' in st.query_params and st.query_params['submit_status'] == 's
     
     st.markdown("---")
     st.info("Obrigado por contribuir!")
+    
+    # Limpa o parâmetro de sucesso após exibição para que o formulário apareça na próxima interação
+    st.query_params.pop('submit_status')
+    st.query_params.pop('nome')
+    st.query_params.pop('nps')
+
 
 elif submit:
     # Lógica de processamento e salvamento
@@ -198,11 +199,12 @@ elif submit:
         }])
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
+        # 🚨 CORREÇÃO PRINCIPAL: Resetar o estado do selectbox e do text_input antes do rerun
+        st.session_state['conheceu_select'] = "Selecione uma opção" # Reset Selectbox
+        st.session_state['aniversario_raw_value'] = "" # Reset Data
+        # O campo como_outro é limpo automaticamente pelo código dentro do form
+        
         # 2. Redirecionamento para a página de sucesso (com parâmetros)
-        # Limpa o input de data para o próximo uso
-        st.session_state.aniversario_raw_value = "" 
-
-        # Redireciona a página para exibir as mensagens de agradecimento fora do form
         params = st.query_params.to_dict()
         params.update({
             'submit_status': 'success',
