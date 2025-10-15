@@ -49,7 +49,6 @@ if "respostas" not in st.session_state:
 if 'aniversario_raw_value' not in st.session_state:
     st.session_state.aniversario_raw_value = ""
 
-
 # =========================================================
 # TÍTULO E SEGMENTO
 # =========================================================
@@ -74,16 +73,20 @@ else:
         "Indicação de amigo/familiar","Passando em frente ao restaurante","Placa na entrada de Schroeder (ponte)","Outro:"
     ]
 
-# O estado do seletor é mantido pelo índice. Se quisermos resetar, alteramos o st.session_state["conheceu_select"]
-# Usamos index=opcoes_conheceu.index(st.session_state.get('conheceu_select_value', opcoes_conheceu[0])) para manter o valor antes do submit
+# O widget Selectbox (precisa estar fora do form para atualização imediata)
 como_conheceu = st.selectbox("Como nos conheceu?", opcoes_conheceu, key="conheceu_select")
 
 # Campo "Outro:" Condicional
 como_outro = ""
 if como_conheceu == "Outro:":
-    como_outro = st.text_input("Como nos conheceu? (Especifique):", key="como_outro_input")
+    # Usamos st.session_state para este campo também, caso ele tenha sido preenchido
+    if 'como_outro_input_value' not in st.session_state:
+        st.session_state.como_outro_input_value = ""
+    como_outro = st.text_input("Como nos conheceu? (Especifique):", value=st.session_state.como_outro_input_value, key="como_outro_input")
 else:
+    # Garante que o estado seja limpo se a opção for mudada, mas NÃO AQUI.
     como_outro = ""
+
 
 # =========================================================
 # FORMULÁRIO (Somente o que precisa ser enviado junto)
@@ -102,7 +105,7 @@ else:
         st.session_state.aniversario_raw_value = aniversario_raw 
         aniversario = formatar_data(aniversario_raw)
 
-        # Visualização simples do Como Conheceu (sem precisar re-declarar o widget)
+        # Visualização simples do Como Conheceu
         st.markdown(f"**Como nos conheceu:** {como_conheceu}{f' (Especificado: {como_outro})' if como_outro else ''}")
         
         st.markdown("---")
@@ -131,7 +134,7 @@ else:
 
 
 # =========================================================
-# PROCESSAMENTO E MENSAGENS (CORRIGIDO)
+# PROCESSAMENTO E MENSAGENS 
 # =========================================================
 if 'submit_status' in st.query_params and st.query_params['submit_status'] == 'success':
     # Lógica de URL para exibir mensagens de sucesso (NÃO MEXEMOS AQUI)
@@ -199,10 +202,10 @@ elif submit:
         }])
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
-        # 🚨 CORREÇÃO PRINCIPAL: Resetar o estado do selectbox e do text_input antes do rerun
-        st.session_state['conheceu_select'] = "Selecione uma opção" # Reset Selectbox
-        st.session_state['aniversario_raw_value'] = "" # Reset Data
-        # O campo como_outro é limpo automaticamente pelo código dentro do form
+        # 🚨 CORREÇÃO PRINCIPAL: Resetar o estado dos campos antes do rerun
+        st.session_state['conheceu_select'] = "Selecione uma opção" # Reset Selectbox (Funciona com o rerun)
+        st.session_state['aniversario_raw_input'] = "" # Reset Data Input
+        st.session_state['como_outro_input_value'] = "" # Reset Campo "Outro"
         
         # 2. Redirecionamento para a página de sucesso (com parâmetros)
         params = st.query_params.to_dict()
