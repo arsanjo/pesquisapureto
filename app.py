@@ -84,8 +84,7 @@ if como_conheceu == "Outro:":
         st.session_state.como_outro_input_value = ""
     como_outro = st.text_input("Como nos conheceu? (Especifique):", value=st.session_state.como_outro_input_value, key="como_outro_input")
 else:
-    # Garante que o estado seja limpo se a opção for mudada, mas NÃO AQUI.
-    como_outro = ""
+    como_outro = "" 
 
 
 # =========================================================
@@ -97,8 +96,8 @@ else:
     with st.form("pesquisa_form"):
         st.subheader("Sobre você")
         col1, col2, col3 = st.columns(3)
-        nome = col1.text_input("Seu nome completo:")
-        whatsapp = col2.text_input("Seu WhatsApp:")
+        nome = col1.text_input("Seu nome completo:", key="nome_input_form")
+        whatsapp = col2.text_input("Seu WhatsApp:", key="whatsapp_input_form")
         
         # Data de aniversário (lê e salva o input no Session State para manter o valor)
         aniversario_raw = col3.text_input("Data de aniversário (DD/MM/AAAA):", value=st.session_state.aniversario_raw_value, placeholder="Ex: 14101972 (apenas números)", key="aniversario_raw_input")
@@ -116,18 +115,18 @@ else:
 
         if segmento == "Restaurante (Salão)":
             st.subheader("🍽️ Avaliação do Salão")
-            nota_atend = st.radio("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", opcoes, horizontal=True)
-            nota_sabor = st.radio("2️⃣ Qualidade e sabor dos pratos:", opcoes, horizontal=True)
-            nota_ambiente = st.radio("3️⃣ Ambiente e limpeza:", opcoes, horizontal=True)
+            nota_atend = st.radio("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", opcoes, horizontal=True, key="nota_atendimento_s")
+            nota_sabor = st.radio("2️⃣ Qualidade e sabor dos pratos:", opcoes, horizontal=True, key="nota_sabor_s")
+            nota_ambiente = st.radio("3️⃣ Ambiente e limpeza:", opcoes, horizontal=True, key="nota_ambiente_s")
             nota_embalagem = None
-            nps = st.radio("4️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria?", opcoes, horizontal=True)
+            nps = st.radio("4️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria?", opcoes, horizontal=True, key="nps_s")
         else:
             st.subheader("🛵 Avaliação do Delivery")
-            nota_atend = st.radio("1️⃣ Atendimento e facilidade do pedido:", opcoes, horizontal=True)
-            nota_embalagem = st.radio("2️⃣ Logística (tempo e embalagem):", opcoes, horizontal=True)
-            nota_sabor = st.radio("3️⃣ Qualidade e sabor pós-entrega:", opcoes, horizontal=True)
-            nota_ambiente = st.radio("4️⃣ Apresentação e cuidado com os itens:", opcoes, horizontal=True)
-            nps = st.radio("5️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria?", opcoes, horizontal=True)
+            nota_atend = st.radio("1️⃣ Atendimento e facilidade do pedido:", opcoes, horizontal=True, key="nota_atendimento_d")
+            nota_embalagem = st.radio("2️⃣ Logística (tempo e embalagem):", opcoes, horizontal=True, key="nota_embalagem_d")
+            nota_sabor = st.radio("3️⃣ Qualidade e sabor pós-entrega:", opcoes, horizontal=True, key="nota_sabor_d")
+            nota_ambiente = st.radio("4️⃣ Apresentação e cuidado com os itens:", opcoes, horizontal=True, key="nota_ambiente_d")
+            nps = st.radio("5️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria?", opcoes, horizontal=True, key="nps_d")
 
         comentario = st.text_area("💬 Comentários, sugestões, elogios ou reclamações (opcional):", max_chars=500)
         submit = st.form_submit_button("Enviar Respostas ✅")
@@ -137,7 +136,7 @@ else:
 # PROCESSAMENTO E MENSAGENS 
 # =========================================================
 if 'submit_status' in st.query_params and st.query_params['submit_status'] == 'success':
-    # Lógica de URL para exibir mensagens de sucesso (NÃO MEXEMOS AQUI)
+    # Lógica de URL para exibir mensagens de sucesso
     nome_sucesso = st.query_params.get('nome', [''])[0]
     nps_sucesso = int(st.query_params.get('nps', [0])[0])
 
@@ -203,8 +202,8 @@ elif submit:
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
         # 🚨 CORREÇÃO PRINCIPAL: Resetar o estado dos campos antes do rerun
-        st.session_state['conheceu_select'] = "Selecione uma opção" # Reset Selectbox (Funciona com o rerun)
-        st.session_state['aniversario_raw_input'] = "" # Reset Data Input
+        st.session_state['conheceu_select'] = "Selecione uma opção" # Reset Selectbox 
+        st.session_state['aniversario_raw_value'] = "" # Reset Data Input
         st.session_state['como_outro_input_value'] = "" # Reset Campo "Outro"
         
         # 2. Redirecionamento para a página de sucesso (com parâmetros)
