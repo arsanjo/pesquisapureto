@@ -1,27 +1,23 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import altair as alt  # ✅ usamos Altair para gráficos, já incluído no Streamlit
+import altair as alt
 
-# ============================================================
-# CONFIGURAÇÕES INICIAIS
-# ============================================================
+# ============ CONFIGS ============
 st.set_page_config(page_title="Pesquisa de Satisfação - Pureto Sushi", layout="wide")
 GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
 INSTAGRAM_LINK = "https://www.instagram.com/puretosushi"
 ADMIN_KEY = "admin"
 ADMIN_PASSWORD = "pureto2025"
 
-# =========================================================
-# FUNÇÕES
-# =========================================================
+# ============ FUNÇÕES BÁSICAS ============
 def calcular_nps(df):
     """Retorna (nps, %prom, %neut, %det, total)"""
     if df.empty or "NPS_Recomendacao" not in df.columns:
         return 0.0, 0.0, 0.0, 0.0, 0
     total = len(df)
-    promotores = (df["NPS_Recomendacao"] >= 9).sum()
-    detratores = (df["NPS_Recomendacao"] <= 6).sum()
+    promotores = (pd.to_numeric(df["NPS_Recomendacao"], errors="coerce").fillna(0).astype(int) >= 9).sum()
+    detratores = (pd.to_numeric(df["NPS_Recomendacao"], errors="coerce").fillna(0).astype(int) <= 6).sum()
     perc_prom = (promotores / total) * 100 if total else 0
     perc_det = (detratores / total) * 100 if total else 0
     perc_neut = max(0.0, 100 - perc_prom - perc_det)
@@ -38,9 +34,86 @@ def formatar_data(d):
         return f"{digits[:2]}/{digits[2:4]}/{digits[4:]}"
     return d
 
-# =========================================================
-# ESTADOS
-# =========================================================
+# ============ GOOGLE SHEETS HELPER ============
+# usamos cache_resource para reusar a conexão sem recriar a cada run
+@st.cache_resource(show_spinner=False)
+def get_sheet_handles():
+    """
+    Retorna (client, worksheet) conectados ao Google Sheets.
+    Lê as credenciais de st.secrets['gcp_service_account'] e a URL de st.secrets['google_sheet']['sheet_url'].
+    Em caso de erro, retorna (None, None) para que o app continue funcionando.
+    """
+    try:
+        from google.oauth2.service_account import Credentials
+        import gspread
+
+        secrets = st.secrets.get("gcp_service_account", None)
+        sheet_url = st.secrets.get("google_sheet", {}).get("sheet_url", "")
+
+        if not secrets or not sheet_url:
+            return None, None
+
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+        ]
+        creds = Credentials.from_service_account_info(dict(secrets), scopes=scopes)
+        client = gspread.authorize(creds)
+        sh = client.open_by_url(sheet_url)
+        ws = sh.sheet1  # primeira aba
+        return client, ws
+    except Exception:
+        return None, None
+
+def save_response_to_sheet(row_dict):
+    """
+    Salva UMA resposta na planilha, seguindo a ordem dos cabeçalhos.
+    Silencioso em caso de erro (mostra aviso na interface e segue).
+    """
+    _, ws = get_sheet_handles()
+    if ws is None:
+        st.warning("⚠️ Não foi possível salvar na planilha agora. A conexão com o Google Sheets não está ativa.")
+        return False
+
+    headers = [
+        "Data","Nome","Whatsapp","Aniversario","Como_Conheceu","Segmento",
+        "Nota_Atendimento","Nota_Qualidade_Sabor","Nota_Entrega_Ambiente",
+        "Nota_Pedido_Embalagem","NPS_Recomendacao","Comentario"
+    ]
+    values = [row_dict.get(h, "") for h in headers]
+    try:
+        ws.append_row(values, value_input_option="USER_ENTERED")
+        return True
+    except Exception as e:
+        st.warning("⚠️ Ocorreu um problema ao gravar na planilha. Tente novamente em instantes.")
+        return False
+
+def load_responses_from_sheet() -> pd.DataFrame:
+    """
+    Lê TODAS as respostas da planilha e retorna como DataFrame.
+    Se não houver acesso, retorna DataFrame vazio com as colunas corretas.
+    """
+    _, ws = get_sheet_handles()
+    headers = [
+        "Data","Nome","Whatsapp","Aniversario","Como_Conheceu","Segmento",
+        "Nota_Atendimento","Nota_Qualidade_Sabor","Nota_Entrega_Ambiente",
+        "Nota_Pedido_Embalagem","NPS_Recomendacao","Comentario"
+    ]
+    if ws is None:
+        return pd.DataFrame(columns=headers)
+
+    try:
+        records = ws.get_all_records()  # lista de dicts
+        df = pd.DataFrame(records)
+        # garante colunas presentes
+        for h in headers:
+            if h not in df.columns:
+                df[h] = []
+        return df[headers]
+    except Exception:
+        return pd.DataFrame(columns=headers)
+
+# ============ ESTADOS ============
 if "respostas" not in st.session_state:
     st.session_state.respostas = pd.DataFrame(columns=[
         "Data","Nome","Whatsapp","Aniversario","Como_Conheceu","Segmento",
@@ -58,25 +131,26 @@ if 'ultimo_nps' not in st.session_state:
 if 'ultimo_nome' not in st.session_state:
     st.session_state.ultimo_nome = ""
 
-# =========================================================
-# CHECAGEM DE MODO ADMIN
-# =========================================================
+# ============ MODO ADMIN? ============
 query = st.query_params
 admin_mode = (ADMIN_KEY in query and query[ADMIN_KEY] == ADMIN_PASSWORD)
 
 # =========================================================
-# DASHBOARD ADMINISTRATIVO (exclusivo quando ?admin=pureto2025)
+# DASHBOARD ADMINISTRATIVO
 # =========================================================
 if admin_mode:
     st.markdown("## 🔐 Dashboard Administrativo")
 
-    df = st.session_state.respostas.copy()
+    # agora o dashboard lê SEMPRE da planilha (persistente)
+    df = load_responses_from_sheet()
 
     if df.empty:
         st.warning("Ainda não há respostas coletadas.")
     else:
         # Conversões seguras
-        df["NPS_Recomendacao"] = pd.to_numeric(df["NPS_Recomendacao"], errors="coerce").fillna(0).astype(int)
+        for col in ["Nota_Atendimento","Nota_Qualidade_Sabor","Nota_Entrega_Ambiente","Nota_Pedido_Embalagem","NPS_Recomendacao"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
 
         # Resumos
         nps_geral, prom_g, neut_g, det_g, total = calcular_nps(df)
@@ -95,7 +169,7 @@ if admin_mode:
         st.markdown("---")
         st.markdown("### 📈 NPS por experiência")
 
-        # ---------- Gráfico de barras (Altair): NPS Geral x Salão x Delivery ----------
+        # Gráfico de barras (Altair)
         nps_df = pd.DataFrame({
             "Categoria": ["Geral", "Salão", "Delivery"],
             "NPS": [round(nps_geral, 1), round(nps_salao, 1), round(nps_delivery, 1)]
@@ -103,7 +177,11 @@ if admin_mode:
         bar = (
             alt.Chart(nps_df)
             .mark_bar()
-            .encode(x=alt.X("Categoria:N", title=""), y=alt.Y("NPS:Q", scale=alt.Scale(domain=[-100, 100])))
+            .encode(
+                x=alt.X("Categoria:N", title=""),
+                y=alt.Y("NPS:Q", scale=alt.Scale(domain=[-100, 100])),
+                tooltip=["Categoria:N","NPS:Q"]
+            )
             .properties(height=320)
         )
         labels = (
@@ -113,7 +191,7 @@ if admin_mode:
         )
         st.altair_chart(bar + labels, use_container_width=True)
 
-        # ---------- Gráfico de pizza (Altair): proporção Salão vs Delivery ----------
+        # Gráfico de pizza (Altair)
         st.markdown("### 🥧 Distribuição de experiências")
         dist_df = pd.DataFrame({
             "Experiência": ["Salão", "Delivery"],
@@ -124,7 +202,7 @@ if admin_mode:
 
         pie = (
             alt.Chart(dist_df)
-            .mark_arc(innerRadius=60)  # donut
+            .mark_arc(innerRadius=60)
             .encode(
                 theta="Quantidade:Q",
                 color=alt.Color("Experiência:N", legend=alt.Legend(title="Experiência")),
@@ -136,12 +214,12 @@ if admin_mode:
 
         st.markdown("---")
         st.markdown("### 🧾 Respostas coletadas")
-        csv = to_csv_bytes(df)
+        csv = to_csv_bytes(df.sort_values(by="Data", ascending=False))
         st.download_button("📥 Baixar Respostas (CSV)", csv, "respostas_pesquisa.csv", "text/csv")
         st.dataframe(df.sort_values(by="Data", ascending=False), use_container_width=True)
 
 # =========================================================
-# MODO PÚBLICO (formulário e mensagens) — só quando NÃO é admin
+# MODO PÚBLICO (FORMULÁRIO + MENSAGENS)
 # =========================================================
 else:
     if not st.session_state.submitted:
@@ -217,7 +295,7 @@ else:
                 st.error("⚠️ Data de aniversário inválida. Por favor, use 8 dígitos (DDMMAAAA).")
             else:
                 como_conheceu_final = como_outro if como_conheceu == "Outro:" else como_conheceu
-                nova = pd.DataFrame([{
+                nova_dict = {
                     "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
                     "Nome": nome,
                     "Whatsapp": whatsapp,
@@ -227,11 +305,16 @@ else:
                     "Nota_Atendimento": nota_atend,
                     "Nota_Qualidade_Sabor": nota_sabor,
                     "Nota_Entrega_Ambiente": nota_ambiente,
-                    "Nota_Pedido_Embalagem": nota_embalagem,
+                    "Nota_Pedido_Embalagem": nota_embalagem if nota_embalagem is not None else "",
                     "NPS_Recomendacao": nps,
                     "Comentario": comentario
-                }])
-                st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
+                }
+
+                # salva local (sessão) apenas para compatibilidade com a tela de sucesso
+                st.session_state.respostas = pd.concat([st.session_state.respostas, pd.DataFrame([nova_dict])], ignore_index=True)
+
+                # salva na PLANILHA (persistente)
+                save_response_to_sheet(nova_dict)
 
                 st.session_state.submitted = True
                 st.session_state.ultimo_nome = nome
