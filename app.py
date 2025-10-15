@@ -9,7 +9,6 @@ st.set_page_config(page_title="Pesquisa de Satisfação - Pureto Sushi", layout=
 GOOGLE_REVIEW_LINK = "https://g.page/puretosushi/review"
 ADMIN_KEY = "admin"
 ADMIN_PASSWORD = "pureto2025"
-SUBMIT_KEY = 'pesquisa_enviada'
 
 # =========================================================
 # FUNÇÕES
@@ -49,58 +48,17 @@ if 'aniversario_raw_value' not in st.session_state:
     st.session_state.aniversario_raw_value = ""
 if 'como_outro_input_value' not in st.session_state:
     st.session_state.como_outro_input_value = ""
+if 'submitted' not in st.session_state:
+    st.session_state.submitted = False
+if 'ultimo_nps' not in st.session_state:
+    st.session_state.ultimo_nps = 0
+if 'ultimo_nome' not in st.session_state:
+    st.session_state.ultimo_nome = ""
 
 # =========================================================
-# PROCESSAMENTO: MODO SUCESSO
+# INTERFACE
 # =========================================================
-if 'submit_status' in st.query_params and st.query_params['submit_status'] == 'success':
-    # ✅ Correção aplicada aqui
-    try:
-        nps_val = st.query_params.get('nps', [0])[0]
-        nps_sucesso = int(float(str(nps_val).replace(",", ".")))
-    except Exception:
-        nps_sucesso = 0
-
-    nome_sucesso = st.query_params.get('nome', [''])[0]
-
-    st.success("✅ Pesquisa enviada com sucesso!")
-    st.markdown(f"""
-    <div style='background-color:#e8f5e9; color:#1b5e20; padding:20px; border-radius:10px; margin-top:20px;'>
-    <h3>🎉 {nome_sucesso}, muito obrigado pelas suas respostas sinceras!</h3>
-    <p>Seu feedback é essencial para aperfeiçoarmos cada detalhe do <b>Pureto Sushi</b>.</p>
-    <p>Para agradecer, você ganhou um <b>cupom especial de 10% de desconto</b> na sua próxima compra.</p>
-    <p style='font-size:1.2em;'><b>Use o código:</b> <span style='color:#007bff;'>PESQUISA</span></p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ✅ Agora o bloco abaixo funcionará corretamente quando nps >= 9
-    if nps_sucesso >= 9:
-        st.balloons()
-        st.markdown(f"""
-        <div style='background-color:#fff3cd; color:#856404; padding:20px; border-radius:10px; margin-top:25px;'>
-        <h4 style='font-weight:bold;'>Google <span style='font-size:1.5em;'>⭐⭐⭐⭐⭐</span></h4>
-        <p>{nome_sucesso}, e que tal compartilhar sua opinião lá no Google? Isso nos ajuda muito! 🙏</p>
-        <p><b>Como gratidão, sua próxima entrega é grátis!</b></p>
-        <a href='{GOOGLE_REVIEW_LINK}' target='_blank'
-           style='background-color:#f0ad4e; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;'>
-           💬 Avaliar no Google
-        </a>
-        </div>""", unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.info("Obrigado por contribuir!")
-
-    # Limpa parâmetros para que formulário reapareça depois
-    for k in ["submit_status", "nome", "nps"]:
-        try:
-            st.query_params.pop(k)
-        except:
-            pass
-
-# =========================================================
-# FORMULÁRIO NORMAL (SÓ APARECE SE AINDA NÃO ENVIADO)
-# =========================================================
-else:
+if not st.session_state.submitted:
     st.markdown("<h1 style='text-align:center;'>Pesquisa de Satisfação</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós! Leva menos de 40 segundos.</p>", unsafe_allow_html=True)
     st.markdown("---")
@@ -169,7 +127,7 @@ else:
         if not nome or not whatsapp or como_conheceu == "Selecione uma opção":
             st.error("⚠️ Por favor, preencha Nome, WhatsApp e Como nos conheceu.")
         elif aniversario and (aniversario == aniversario_raw or len(aniversario_raw) != 8):
-            st.error("⚠️ Data de aniversário inválida. Por favor, use 8 dígitos (DDMMAAAA) ou preencha corretamente.")
+            st.error("⚠️ Data de aniversário inválida. Por favor, use 8 dígitos (DDMMAAAA).")
         else:
             como_conheceu_final = como_outro if como_conheceu == "Outro:" else como_conheceu
             nova = pd.DataFrame([{
@@ -188,14 +146,50 @@ else:
             }])
             st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
-            params = st.query_params.to_dict()
-            params.update({
-                "submit_status": "success",
-                "nome": nome,
-                "nps": str(nps)
-            })
-            st.query_params.update(params)
+            # salva para pós-envio
+            st.session_state.submitted = True
+            st.session_state.ultimo_nome = nome
+            st.session_state.ultimo_nps = nps
             st.rerun()
+
+# =========================================================
+# TELA DE SUCESSO
+# =========================================================
+else:
+    nome_sucesso = st.session_state.ultimo_nome
+    nps_sucesso = int(st.session_state.ultimo_nps)
+
+    st.success("✅ Pesquisa enviada com sucesso!")
+    st.markdown(f"""
+    <div style='background-color:#e8f5e9; color:#1b5e20; padding:20px; border-radius:10px; margin-top:20px;'>
+    <h3>🎉 {nome_sucesso}, muito obrigado pelas suas respostas sinceras!</h3>
+    <p>Seu feedback é essencial para aperfeiçoarmos cada detalhe do <b>Pureto Sushi</b>.</p>
+    <p>Para agradecer, você ganhou um <b>cupom especial de 10% de desconto</b> na sua próxima compra.</p>
+    <p style='font-size:1.2em;'><b>Use o código:</b> <span style='color:#007bff;'>PESQUISA</span></p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if nps_sucesso >= 9:
+        st.balloons()
+        st.markdown(f"""
+        <div style='background-color:#fff3cd; color:#856404; padding:20px; border-radius:10px; margin-top:25px;'>
+        <h4 style='font-weight:bold;'>Google <span style='font-size:1.5em;'>⭐⭐⭐⭐⭐</span></h4>
+        <p>{nome_sucesso}, e que tal compartilhar sua opinião lá no Google? Isso nos ajuda muito! 🙏</p>
+        <p><b>Como gratidão, sua próxima entrega é grátis!</b></p>
+        <a href='{GOOGLE_REVIEW_LINK}' target='_blank'
+           style='background-color:#f0ad4e; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;'>
+           💬 Avaliar no Google
+        </a>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.info("Obrigado por contribuir!")
+
+    if st.button("📝 Enviar nova resposta"):
+        st.session_state.submitted = False
+        st.session_state.ultimo_nps = 0
+        st.session_state.ultimo_nome = ""
+        st.experimental_rerun()
 
 # =========================================================
 # ADMIN
