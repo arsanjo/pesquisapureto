@@ -336,7 +336,8 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        if nps_sucesso >= 9:
+        # ✅ Correção aplicada aqui
+        if float(nps_sucesso) >= 9:
             st.balloons()
             st.markdown(f"""
             <div style='background-color:#fff3cd; color:#856404; padding:20px; border-radius:10px; margin-top:25px;'>
@@ -344,23 +345,4 @@ else:
             <p>{nome_sucesso}, e que tal compartilhar sua opinião lá no Google? Isso nos ajuda muito! 🙏</p>
             <p><b>Como gratidão pela sua avaliação no Google, sua próxima entrega será grátis!</b></p>
             <a href='{GOOGLE_REVIEW_LINK}' target='_blank'
-               style='background-color:#f0ad4e; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;'>
-               💬 Avaliar no Google
-            </a>
-            </div>""", unsafe_allow_html=True)
-
-        # CTA INSTAGRAM (sempre)
-        st.markdown(f"""
-        <div style='background-color:#f5f5f5; color:#222; padding:20px; border-radius:10px; margin-top:30px; text-align:center;'>
-            <p style='font-size:1.1em;'>
-                <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" width="22" style="vertical-align:middle; margin-right:6px;">
-                Siga a <b>Pureto Sushi</b> no Instagram:
-                <a href="{INSTAGRAM_LINK}" target="_blank" style="color:#e1306c; text-decoration:none; font-weight:bold;">
-                    @puretosushi
-                </a>
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.info("Obrigado por contribuir!")
+               style='background-color:#f0ad4e; color:white
