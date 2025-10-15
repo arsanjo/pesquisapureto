@@ -35,14 +35,8 @@ def formatar_data(d):
     return d
 
 # ============ GOOGLE SHEETS HELPER ============
-# usamos cache_resource para reusar a conexão sem recriar a cada run
 @st.cache_resource(show_spinner=False)
 def get_sheet_handles():
-    """
-    Retorna (client, worksheet) conectados ao Google Sheets.
-    Lê as credenciais de st.secrets['gcp_service_account'] e a URL de st.secrets['google_sheet']['sheet_url'].
-    Em caso de erro, retorna (None, None) para que o app continue funcionando.
-    """
     try:
         from google.oauth2.service_account import Credentials
         import gspread
@@ -60,16 +54,12 @@ def get_sheet_handles():
         creds = Credentials.from_service_account_info(dict(secrets), scopes=scopes)
         client = gspread.authorize(creds)
         sh = client.open_by_url(sheet_url)
-        ws = sh.sheet1  # primeira aba
+        ws = sh.sheet1
         return client, ws
     except Exception:
         return None, None
 
 def save_response_to_sheet(row_dict):
-    """
-    Salva UMA resposta na planilha, seguindo a ordem dos cabeçalhos.
-    Silencioso em caso de erro (mostra aviso na interface e segue).
-    """
     _, ws = get_sheet_handles()
     if ws is None:
         st.warning("⚠️ Não foi possível salvar na planilha agora. A conexão com o Google Sheets não está ativa.")
@@ -84,15 +74,11 @@ def save_response_to_sheet(row_dict):
     try:
         ws.append_row(values, value_input_option="USER_ENTERED")
         return True
-    except Exception as e:
+    except Exception:
         st.warning("⚠️ Ocorreu um problema ao gravar na planilha. Tente novamente em instantes.")
         return False
 
 def load_responses_from_sheet() -> pd.DataFrame:
-    """
-    Lê TODAS as respostas da planilha e retorna como DataFrame.
-    Se não houver acesso, retorna DataFrame vazio com as colunas corretas.
-    """
     _, ws = get_sheet_handles()
     headers = [
         "Data","Nome","Whatsapp","Aniversario","Como_Conheceu","Segmento",
@@ -101,11 +87,9 @@ def load_responses_from_sheet() -> pd.DataFrame:
     ]
     if ws is None:
         return pd.DataFrame(columns=headers)
-
     try:
-        records = ws.get_all_records()  # lista de dicts
+        records = ws.get_all_records()
         df = pd.DataFrame(records)
-        # garante colunas presentes
         for h in headers:
             if h not in df.columns:
                 df[h] = []
@@ -131,7 +115,7 @@ if 'ultimo_nps' not in st.session_state:
 if 'ultimo_nome' not in st.session_state:
     st.session_state.ultimo_nome = ""
 
-# ============ MODO ADMIN? ============
+# ============ MODO ADMIN ============
 query = st.query_params
 admin_mode = (ADMIN_KEY in query and query[ADMIN_KEY] == ADMIN_PASSWORD)
 
@@ -140,36 +124,29 @@ admin_mode = (ADMIN_KEY in query and query[ADMIN_KEY] == ADMIN_PASSWORD)
 # =========================================================
 if admin_mode:
     st.markdown("## 🔐 Dashboard Administrativo")
-
-    # agora o dashboard lê SEMPRE da planilha (persistente)
     df = load_responses_from_sheet()
 
     if df.empty:
         st.warning("Ainda não há respostas coletadas.")
     else:
-        # Conversões seguras
         for col in ["Nota_Atendimento","Nota_Qualidade_Sabor","Nota_Entrega_Ambiente","Nota_Pedido_Embalagem","NPS_Recomendacao"]:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
-        # Resumos
         nps_geral, prom_g, neut_g, det_g, total = calcular_nps(df)
         df_salao = df[df["Segmento"] == "Restaurante (Salão)"]
         df_delivery = df[df["Segmento"] == "Delivery (Entrega)"]
         nps_salao, *_ = calcular_nps(df_salao)
         nps_delivery, *_ = calcular_nps(df_delivery)
 
-        with st.container():
-            colA, colB, colC, colD = st.columns(4)
-            colA.metric("Total de Respostas", f"{total}")
-            colB.metric("NPS Geral", f"{nps_geral:.1f}")
-            colC.metric("Total Salão", f"{len(df_salao)}")
-            colD.metric("Total Delivery", f"{len(df_delivery)}")
+        colA, colB, colC, colD = st.columns(4)
+        colA.metric("Total de Respostas", f"{total}")
+        colB.metric("NPS Geral", f"{nps_geral:.1f}")
+        colC.metric("Total Salão", f"{len(df_salao)}")
+        colD.metric("Total Delivery", f"{len(df_delivery)}")
 
         st.markdown("---")
         st.markdown("### 📈 NPS por experiência")
-
-        # Gráfico de barras (Altair)
         nps_df = pd.DataFrame({
             "Categoria": ["Geral", "Salão", "Delivery"],
             "NPS": [round(nps_geral, 1), round(nps_salao, 1), round(nps_delivery, 1)]
@@ -191,14 +168,13 @@ if admin_mode:
         )
         st.altair_chart(bar + labels, use_container_width=True)
 
-        # Gráfico de pizza (Altair)
         st.markdown("### 🥧 Distribuição de experiências")
         dist_df = pd.DataFrame({
             "Experiência": ["Salão", "Delivery"],
             "Quantidade": [len(df_salao), len(df_delivery)]
         })
         if dist_df["Quantidade"].sum() == 0:
-            dist_df.loc[0, "Quantidade"] = 1  # evita erro com pizza vazia
+            dist_df.loc[0, "Quantidade"] = 1
 
         pie = (
             alt.Chart(dist_df)
@@ -223,108 +199,82 @@ if admin_mode:
 # =========================================================
 else:
     if not st.session_state.submitted:
-        # Título
         st.markdown("<h1 style='text-align:center;'>Pesquisa de Satisfação</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós! Leva menos de 40 segundos.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós!</p>", unsafe_allow_html=True)
         st.markdown("---")
 
-        segmento = st.radio("**Sua compra na Pureto foi?**", ["Restaurante (Salão)", "Delivery (Entrega)"], horizontal=True, key="segmento_selecionado")
+        segmento = st.radio("**Sua compra na Pureto foi?**", ["Restaurante (Salão)", "Delivery (Entrega)"], horizontal=True)
         st.markdown("---")
 
         if segmento == "Restaurante (Salão)":
             opcoes_conheceu = [
                 "Selecione uma opção","Já era cliente do delivery","Instagram","Facebook","Google",
-                "Indicação de amigo/familiar","Passando em frente ao restaurante","Placa na entrada de Schroeder (ponte)","Outro:"
+                "Indicação de amigo/familiar","Passando em frente ao restaurante","Outro:"
             ]
         else:
             opcoes_conheceu = [
                 "Selecione uma opção","Já era cliente do salão","Instagram","Facebook","Google",
-                "Indicação de amigo/familiar","Passando em frente ao restaurante","Placa na entrada de Schroeder (ponte)","Outro:"
+                "Indicação de amigo/familiar","Passando em frente ao restaurante","Outro:"
             ]
 
-        como_conheceu = st.selectbox("Como nos conheceu?", opcoes_conheceu, key="conheceu_select")
-
+        como_conheceu = st.selectbox("Como nos conheceu?", opcoes_conheceu)
         como_outro = ""
         if como_conheceu == "Outro:":
-            como_outro = st.text_input("Como nos conheceu? (Especifique):", value=st.session_state.como_outro_input_value, key="como_outro_input")
-        else:
-            como_outro = ""
+            como_outro = st.text_input("Como nos conheceu? (Especifique):")
 
         with st.form("pesquisa_form"):
             st.subheader("Sobre você")
             col1, col2, col3 = st.columns(3)
-            nome = col1.text_input("Seu nome completo:", key="nome_input_form")
-            whatsapp = col2.text_input("Seu WhatsApp:", key="whatsapp_input_form")
-            aniversario_raw = col3.text_input(
-                "Data de aniversário (DD/MM/AAAA):",
-                value=st.session_state.aniversario_raw_value,
-                placeholder="Ex: 14101972 (apenas números)",
-                key="aniversario_raw_input"
-            )
-            st.session_state.aniversario_raw_value = aniversario_raw
+            nome = col1.text_input("Seu nome completo:")
+            whatsapp = col2.text_input("Seu WhatsApp:")
+            aniversario_raw = col3.text_input("Data de aniversário (DD/MM/AAAA):", placeholder="Ex: 14101972")
             aniversario = formatar_data(aniversario_raw)
 
-            st.markdown(f"**Como nos conheceu:** {como_conheceu}{f' (Especificado: {como_outro})' if como_outro else ''}")
             st.markdown("---")
-
             opcoes = list(range(0, 11))
-            nota_atend, nota_sabor, nota_ambiente, nota_embalagem, nps = 0, 0, 0, None, 0
-
             if segmento == "Restaurante (Salão)":
-                st.subheader("🍽️ Avaliação do Salão")
-                nota_atend = st.radio("1️⃣ Atendimento da equipe (cortesia, agilidade e simpatia):", opcoes, horizontal=True, key="nota_atendimento_s")
-                nota_sabor = st.radio("2️⃣ Qualidade e sabor dos pratos:", opcoes, horizontal=True, key="nota_sabor_s")
-                nota_ambiente = st.radio("3️⃣ Ambiente e limpeza:", opcoes, horizontal=True, key="nota_ambiente_s")
-                nota_embalagem = None
-                nps = st.radio("4️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria?", opcoes, horizontal=True, key="nps_s")
+                nota_atend = st.radio("1️⃣ Atendimento:", opcoes, horizontal=True)
+                nota_sabor = st.radio("2️⃣ Sabor:", opcoes, horizontal=True)
+                nota_ambiente = st.radio("3️⃣ Ambiente:", opcoes, horizontal=True)
+                nota_embalagem = ""
+                nps = st.radio("4️⃣ Recomendação:", opcoes, horizontal=True)
             else:
-                st.subheader("🛵 Avaliação do Delivery")
-                nota_atend = st.radio("1️⃣ Atendimento e facilidade do pedido:", opcoes, horizontal=True, key="nota_atendimento_d")
-                nota_embalagem = st.radio("2️⃣ Logística (tempo e embalagem):", opcoes, horizontal=True, key="nota_embalagem_d")
-                nota_sabor = st.radio("3️⃣ Qualidade e sabor pós-entrega:", opcoes, horizontal=True, key="nota_sabor_d")
-                nota_ambiente = st.radio("4️⃣ Apresentação e cuidado com os itens:", opcoes, horizontal=True, key="nota_ambiente_d")
-                nps = st.radio("5️⃣ Em uma escala de 0 a 10, o quanto você nos recomendaria?", opcoes, horizontal=True, key="nps_d")
+                nota_atend = st.radio("1️⃣ Atendimento:", opcoes, horizontal=True)
+                nota_embalagem = st.radio("2️⃣ Logística:", opcoes, horizontal=True)
+                nota_sabor = st.radio("3️⃣ Sabor:", opcoes, horizontal=True)
+                nota_ambiente = st.radio("4️⃣ Cuidado com os itens:", opcoes, horizontal=True)
+                nps = st.radio("5️⃣ Recomendação:", opcoes, horizontal=True)
 
-            comentario = st.text_area("💬 Comentários, sugestões, elogios ou reclamações (opcional):", max_chars=500, key="comentario_input_form")
+            comentario = st.text_area("💬 Comentário (opcional):")
             submit = st.form_submit_button("Enviar Respostas ✅")
 
         if submit:
-            if not nome or not whatsapp or como_conheceu == "Selecione uma opção":
-                st.error("⚠️ Por favor, preencha Nome, WhatsApp e Como nos conheceu.")
-            elif aniversario and (aniversario == aniversario_raw or len(aniversario_raw) != 8):
-                st.error("⚠️ Data de aniversário inválida. Por favor, use 8 dígitos (DDMMAAAA).")
+            if not nome or not whatsapp:
+                st.error("⚠️ Preencha Nome e WhatsApp.")
             else:
-                como_conheceu_final = como_outro if como_conheceu == "Outro:" else como_conheceu
                 nova_dict = {
                     "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
                     "Nome": nome,
                     "Whatsapp": whatsapp,
                     "Aniversario": aniversario,
-                    "Como_Conheceu": como_conheceu_final,
+                    "Como_Conheceu": como_outro if como_conheceu == "Outro:" else como_conheceu,
                     "Segmento": segmento,
                     "Nota_Atendimento": nota_atend,
                     "Nota_Qualidade_Sabor": nota_sabor,
                     "Nota_Entrega_Ambiente": nota_ambiente,
-                    "Nota_Pedido_Embalagem": nota_embalagem if nota_embalagem is not None else "",
+                    "Nota_Pedido_Embalagem": nota_embalagem,
                     "NPS_Recomendacao": nps,
                     "Comentario": comentario
                 }
-
-                # salva local (sessão) apenas para compatibilidade com a tela de sucesso
-                st.session_state.respostas = pd.concat([st.session_state.respostas, pd.DataFrame([nova_dict])], ignore_index=True)
-
-                # salva na PLANILHA (persistente)
                 save_response_to_sheet(nova_dict)
-
                 st.session_state.submitted = True
                 st.session_state.ultimo_nome = nome
                 st.session_state.ultimo_nps = nps
                 st.rerun()
 
     else:
-        # TELA DE SUCESSO
         nome_sucesso = st.session_state.ultimo_nome
-        nps_sucesso = int(st.session_state.ultimo_nps)
+        nps_sucesso = float(st.session_state.ultimo_nps)
 
         st.success("✅ Pesquisa enviada com sucesso!")
         st.markdown(f"""
@@ -336,7 +286,6 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        # ✅ Correção aplicada aqui
         if float(nps_sucesso) >= 9:
             st.balloons()
             st.markdown(f"""
@@ -345,4 +294,23 @@ else:
             <p>{nome_sucesso}, e que tal compartilhar sua opinião lá no Google? Isso nos ajuda muito! 🙏</p>
             <p><b>Como gratidão pela sua avaliação no Google, sua próxima entrega será grátis!</b></p>
             <a href='{GOOGLE_REVIEW_LINK}' target='_blank'
-               style='background-color:#f0ad4e; color:white
+               style='background-color:#f0ad4e; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;'>
+               💬 Avaliar no Google
+            </a>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div style='background-color:#f5f5f5; color:#222; padding:20px; border-radius:10px; margin-top:30px; text-align:center;'>
+            <p style='font-size:1.1em;'>
+                <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" width="22" style="vertical-align:middle; margin-right:6px;">
+                Siga a <b>Pureto Sushi</b> no Instagram:
+                <a href="{INSTAGRAM_LINK}" target="_blank" style="color:#e1306c; text-decoration:none; font-weight:bold;">
+                    @puretosushi
+                </a>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.info("Obrigado por contribuir!")
