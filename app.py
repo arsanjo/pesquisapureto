@@ -93,7 +93,12 @@ else:
         col1, col2, col3 = st.columns(3)
         nome = col1.text_input("Seu nome completo:", key="nome_input_form")
         whatsapp = col2.text_input("Seu WhatsApp:", key="whatsapp_input_form")
-        aniversario_raw = col3.text_input("Data de aniversário (DD/MM/AAAA):", value=st.session_state.aniversario_raw_value, placeholder="Ex: 14101972 (apenas números)", key="aniversario_raw_input")
+        aniversario_raw = col3.text_input(
+            "Data de aniversário (DD/MM/AAAA):",
+            value=st.session_state.aniversario_raw_value,
+            placeholder="Ex: 14101972 (apenas números)",
+            key="aniversario_raw_input"
+        )
         st.session_state.aniversario_raw_value = aniversario_raw
         aniversario = formatar_data(aniversario_raw)
 
@@ -153,7 +158,12 @@ if 'submit_status' in st.query_params and st.query_params['submit_status'] == 's
 
     st.markdown("---")
     st.info("Obrigado por contribuir!")
-    st.experimental_set_query_params()  # limpa parâmetros de sucesso
+    # Limpa apenas os parâmetros usados
+    for k in ["submit_status", "nome", "nps"]:
+        try:
+            st.query_params.pop(k)
+        except Exception:
+            pass
 
 elif submit:
     if not nome or not whatsapp or como_conheceu == "Selecione uma opção":
@@ -178,7 +188,14 @@ elif submit:
         }])
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
-        st.experimental_set_query_params(submit_status="success", nome=nome, nps=nps)
+        # Define os parâmetros pela API nova (sem experimental)
+        params = st.query_params.to_dict()
+        params.update({
+            "submit_status": "success",
+            "nome": nome,
+            "nps": str(nps)
+        })
+        st.query_params.update(params)
         st.rerun()
 
 # =========================================================
