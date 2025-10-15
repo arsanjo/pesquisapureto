@@ -163,7 +163,7 @@ else:
     st.markdown(f"""
     <div style='background-color:#e8f5e9; color:#1b5e20; padding:20px; border-radius:10px; margin-top:20px;'>
     <h3>🎉 {nome_sucesso}, muito obrigado pelas suas respostas sinceras!</h3>
-    <p>Seu feedback é essencial para aperfeiçoarmos cada detalhe na <b>Pureto</b>.</p>
+    <p>Seu feedback é essencial para aperfeiçoarmos cada detalhe do <b>Pureto Sushi</b>.</p>
     <p>Como forma de agradecimento, você ganhou um <b>cupom especial de 10% de desconto</b> na sua próxima compra.</p>
     <p style='font-size:1.2em;'><b>Use o código:</b> <span style='color:#007bff;'>PESQUISA</span></p>
     </div>
@@ -175,7 +175,7 @@ else:
         <div style='background-color:#fff3cd; color:#856404; padding:20px; border-radius:10px; margin-top:25px;'>
         <h4 style='font-weight:bold;'>Google <span style='font-size:1.5em;'>⭐⭐⭐⭐⭐</span></h4>
         <p>{nome_sucesso}, e que tal compartilhar sua opinião lá no Google? Isso nos ajuda muito! 🙏</p>
-        <p><b>Como gratidão pela sua avaliação no google, sua próxima entrega será grátis!</b></p>
+        <p><b>Como gratidão pela sua avaliação no Google, sua próxima entrega será grátis!</b></p>
         <a href='{GOOGLE_REVIEW_LINK}' target='_blank'
            style='background-color:#f0ad4e; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;'>
            💬 Avaliar no Google
@@ -184,12 +184,6 @@ else:
 
     st.markdown("---")
     st.info("Obrigado por contribuir!")
-
-    if st.button("📝 Enviar nova resposta"):
-        st.session_state.submitted = False
-        st.session_state.ultimo_nps = 0
-        st.session_state.ultimo_nome = ""
-        st.experimental_rerun()
 
 # =========================================================
 # ADMIN
