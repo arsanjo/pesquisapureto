@@ -46,6 +46,7 @@ if "respostas" not in st.session_state:
         "Nota_Atendimento","Nota_Qualidade_Sabor","Nota_Entrega_Ambiente",
         "Nota_Pedido_Embalagem","NPS_Recomendacao","Comentario"
     ])
+# Inicializa o valor da data para o formulário
 if 'aniversario_raw_value' not in st.session_state:
     st.session_state.aniversario_raw_value = ""
 
@@ -79,12 +80,12 @@ como_conheceu = st.selectbox("Como nos conheceu?", opcoes_conheceu, key="conhece
 # Campo "Outro:" Condicional
 como_outro = ""
 if como_conheceu == "Outro:":
-    # Usamos st.session_state para este campo também, caso ele tenha sido preenchido
+    # Usamos st.session_state para este campo
     if 'como_outro_input_value' not in st.session_state:
         st.session_state.como_outro_input_value = ""
     como_outro = st.text_input("Como nos conheceu? (Especifique):", value=st.session_state.como_outro_input_value, key="como_outro_input")
 else:
-    como_outro = "" 
+    como_outro = ""
 
 
 # =========================================================
@@ -202,9 +203,10 @@ elif submit:
         st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
         # 🚨 CORREÇÃO PRINCIPAL: Resetar o estado dos campos antes do rerun
-        st.session_state['conheceu_select'] = "Selecione uma opção" # Reset Selectbox 
+        # Remover a linha de reset do st.selectbox (foi o que causou o erro)
         st.session_state['aniversario_raw_value'] = "" # Reset Data Input
-        st.session_state['como_outro_input_value'] = "" # Reset Campo "Outro"
+        # Forçar o reset do text_input 'Como nos conheceu? (Especifique):'
+        st.session_state['como_outro_input_value'] = "" 
         
         # 2. Redirecionamento para a página de sucesso (com parâmetros)
         params = st.query_params.to_dict()
