@@ -54,14 +54,14 @@ if 'como_outro_input_value' not in st.session_state:
 # PROCESSAMENTO: MODO SUCESSO
 # =========================================================
 if 'submit_status' in st.query_params and st.query_params['submit_status'] == 'success':
-    # ✅ Agora prioriza session_state se o valor da URL não estiver disponível
+    # ✅ Correção aplicada aqui
     try:
-        nps_val = st.query_params.get('nps', [None])[0] or st.session_state.get('ultimo_nps', 0)
+        nps_val = st.query_params.get('nps', [0])[0]
         nps_sucesso = int(float(str(nps_val).replace(",", ".")))
     except Exception:
         nps_sucesso = 0
 
-    nome_sucesso = st.query_params.get('nome', [''])[0] or st.session_state.get('ultimo_nome', "")
+    nome_sucesso = st.query_params.get('nome', [''])[0]
 
     st.success("✅ Pesquisa enviada com sucesso!")
     st.markdown(f"""
@@ -73,7 +73,7 @@ if 'submit_status' in st.query_params and st.query_params['submit_status'] == 's
     </div>
     """, unsafe_allow_html=True)
 
-    # ✅ Agora o bloco do Google funciona mesmo se o nps ainda não tiver vindo pela URL
+    # ✅ Agora o bloco abaixo funcionará corretamente quando nps >= 9
     if nps_sucesso >= 9:
         st.balloons()
         st.markdown(f"""
@@ -90,7 +90,7 @@ if 'submit_status' in st.query_params and st.query_params['submit_status'] == 's
     st.markdown("---")
     st.info("Obrigado por contribuir!")
 
-    # Limpa parâmetros para que o formulário volte após sair da página
+    # Limpa parâmetros para que formulário reapareça depois
     for k in ["submit_status", "nome", "nps"]:
         try:
             st.query_params.pop(k)
@@ -187,10 +187,6 @@ else:
                 "Comentario": comentario
             }])
             st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
-
-            # ⚡ Garante persistência imediata para o modo sucesso
-            st.session_state['ultimo_nome'] = nome
-            st.session_state['ultimo_nps'] = nps
 
             params = st.query_params.to_dict()
             params.update({
