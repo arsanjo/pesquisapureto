@@ -90,25 +90,19 @@ if admin_mode:
         st.warning("Ainda não há respostas coletadas.")
         st.stop()
 
-    # CONVERSÃO DE TIPOS
     notas_cols = ["Nota_Atendimento","Nota_Qualidade_Sabor","Nota_Entrega_Ambiente",
                   "Nota_Pedido_Embalagem","NPS_Recomendacao"]
     for c in notas_cols:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    # SUBSETS
     df_salao = df[df["Segmento"] == "Restaurante (Salão)"]
     df_delivery = df[df["Segmento"] == "Delivery (Entrega)"]
 
-    # NPS
     nps_geral, prom_g, neut_g, det_g, total = calcular_nps(df)
     nps_salao, *_ = calcular_nps(df_salao)
     nps_delivery, *_ = calcular_nps(df_delivery)
 
-    # ==============================
-    # RESUMO GERAL
-    # ==============================
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total de Respostas", f"{total}")
     col2.metric("NPS Geral", f"{nps_geral:.1f}")
@@ -117,9 +111,6 @@ if admin_mode:
 
     st.markdown("---")
 
-    # ==============================
-    # NPS POR EXPERIÊNCIA
-    # ==============================
     st.markdown("### 📈 NPS por Experiência")
     nps_df = pd.DataFrame({
         "Categoria": ["Geral", "Salão", "Delivery"],
@@ -139,18 +130,12 @@ if admin_mode:
     st.altair_chart(bar + labels, use_container_width=True)
     st.caption("🟢 Promotores (9–10) | 🟡 Neutros (7–8) | 🔴 Detratores (0–6)")
 
-    # ==============================
-    # MÉDIAS POR CRITÉRIO
-    # ==============================
     st.markdown("### 🍽️ Médias por Critério - Restaurante (Salão)")
     if not df_salao.empty:
         medias_salao = df_salao[["Nota_Atendimento","Nota_Qualidade_Sabor","Nota_Entrega_Ambiente"]].mean()
         df_med_salao = pd.DataFrame({"Critério": medias_salao.index, "Média": medias_salao.values})
-        graf_salao = (
-            alt.Chart(df_med_salao)
-            .mark_bar()
-            .encode(x=alt.X("Critério:N", title=""), y=alt.Y("Média:Q", scale=alt.Scale(domain=[0,10])), tooltip=["Critério","Média"])
-        )
+        graf_salao = alt.Chart(df_med_salao).mark_bar().encode(
+            x=alt.X("Critério:N", title=""), y=alt.Y("Média:Q", scale=alt.Scale(domain=[0,10])), tooltip=["Critério","Média"])
         st.altair_chart(graf_salao, use_container_width=True)
     else:
         st.info("Nenhuma resposta de salão até o momento.")
@@ -159,18 +144,12 @@ if admin_mode:
     if not df_delivery.empty:
         medias_del = df_delivery[["Nota_Atendimento","Nota_Pedido_Embalagem","Nota_Qualidade_Sabor","Nota_Entrega_Ambiente"]].mean()
         df_med_del = pd.DataFrame({"Critério": medias_del.index, "Média": medias_del.values})
-        graf_del = (
-            alt.Chart(df_med_del)
-            .mark_bar()
-            .encode(x=alt.X("Critério:N", title=""), y=alt.Y("Média:Q", scale=alt.Scale(domain=[0,10])), tooltip=["Critério","Média"])
-        )
+        graf_del = alt.Chart(df_med_del).mark_bar().encode(
+            x=alt.X("Critério:N", title=""), y=alt.Y("Média:Q", scale=alt.Scale(domain=[0,10])), tooltip=["Critério","Média"])
         st.altair_chart(graf_del, use_container_width=True)
     else:
         st.info("Nenhuma resposta de delivery até o momento.")
 
-    # ==============================
-    # EVOLUÇÃO DO NPS
-    # ==============================
     st.markdown("### ⏱️ Evolução do NPS ao Longo do Tempo")
     df['Data_Convertida'] = pd.to_datetime(df['Data'], errors='coerce', format='%d/%m/%Y %H:%M')
     nps_time = df.groupby(df['Data_Convertida'].dt.date)['NPS_Recomendacao'].mean().reset_index()
@@ -183,34 +162,19 @@ if admin_mode:
             .properties(height=250)
         )
         st.altair_chart(line, use_container_width=True)
-    else:
-        st.info("Ainda não há dados suficientes para o gráfico de evolução.")
 
-    # ==============================
-    # COMO NOS CONHECEU
-    # ==============================
     st.markdown("### 📣 Como nos conheceu — Canais de aquisição")
     canais = df["Como_Conheceu"].value_counts().reset_index()
     canais.columns = ["Canal", "Quantidade"]
     canais = canais.sort_values(by="Quantidade", ascending=False)
     if not canais.empty:
-        chart_canais = (
-            alt.Chart(canais)
-            .mark_bar()
-            .encode(
-                y=alt.Y("Canal:N", sort='-x', title=""),
-                x=alt.X("Quantidade:Q", title="Quantidade"),
-                tooltip=["Canal:N","Quantidade:Q"]
-            )
-            .properties(height=320)
-        )
+        chart_canais = alt.Chart(canais).mark_bar().encode(
+            y=alt.Y("Canal:N", sort='-x', title=""),
+            x=alt.X("Quantidade:Q", title="Quantidade"),
+            tooltip=["Canal:N","Quantidade:Q"]
+        ).properties(height=320)
         st.altair_chart(chart_canais, use_container_width=True)
-    else:
-        st.info("Nenhum dado disponível sobre 'Como nos conheceu'.")
 
-    # ==============================
-    # FILTRO INDIVIDUAL DE CLIENTE
-    # ==============================
     st.markdown("---")
     st.markdown("### 👤 Ver respostas individuais")
     clientes = sorted(df["Nome"].dropna().unique())
@@ -228,21 +192,30 @@ if admin_mode:
                     st.markdown(f"- {col.replace('_',' ')}: **{d[col]}**")
             if d["Comentario"]:
                 st.markdown(f"#### 💬 Comentário:\n> {d['Comentario']}")
-    else:
-        st.info("Nenhum cliente respondeu ainda.")
 
-    # ==============================
-    # EXPANSOR DE COMENTÁRIOS
-    # ==============================
-    st.markdown("---")
     with st.expander("💬 Ver comentários de todos os clientes"):
         for _, row in df[df["Comentario"].notna() & (df["Comentario"] != "")].iterrows():
             st.markdown(f"**{row['Nome']}** ({row['Segmento']}) — {row['Data']}")
             st.markdown(f"⭐️ NPS: {row['NPS_Recomendacao']} 🗣️ {row['Comentario']}")
             st.markdown("---")
 
-    # DOWNLOAD CSV
-    st.markdown("---")
     csv = to_csv_bytes(df)
     st.download_button("📥 Baixar Respostas (CSV)", csv, "respostas_pureto.csv", "text/csv")
 
+# ==============================
+# RODAPÉ (somente após envio da pesquisa)
+# ==============================
+else:
+    st.markdown("""
+    <div style='text-align:center; font-size:0.9em; color:gray; margin-top:40px; line-height:1.6;'>
+        <p style='margin-bottom:4px;'>
+            Criado e desenvolvido por 
+            <a href='https://wa.me/5547996008166' target='_blank' style='color:#007bff; text-decoration:none; font-weight:bold;'>
+                Arsanjo
+            </a>
+        </p>
+        <p style='font-style:italic; color:#666; margin:0;'>
+            “Tudo o que fizerem, façam de todo o coração, como para o Senhor.”<br>— Colossenses 3:23
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
