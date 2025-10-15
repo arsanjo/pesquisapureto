@@ -54,10 +54,13 @@ if 'como_outro_input_value' not in st.session_state:
 # PROCESSAMENTO: MODO SUCESSO
 # =========================================================
 if 'submit_status' in st.query_params and st.query_params['submit_status'] == 'success':
+    # ✅ Correção aplicada aqui
     try:
-        nps_sucesso = int(float(st.query_params.get('nps', [0])[0]))
-    except:
+        nps_val = st.query_params.get('nps', [0])[0]
+        nps_sucesso = int(float(str(nps_val).replace(",", ".")))
+    except Exception:
         nps_sucesso = 0
+
     nome_sucesso = st.query_params.get('nome', [''])[0]
 
     st.success("✅ Pesquisa enviada com sucesso!")
@@ -70,7 +73,7 @@ if 'submit_status' in st.query_params and st.query_params['submit_status'] == 's
     </div>
     """, unsafe_allow_html=True)
 
-    # Mostrar a segunda mensagem apenas para quem deu nota 9 ou 10
+    # ✅ Agora o bloco abaixo funcionará corretamente quando nps >= 9
     if nps_sucesso >= 9:
         st.balloons()
         st.markdown(f"""
@@ -98,7 +101,6 @@ if 'submit_status' in st.query_params and st.query_params['submit_status'] == 's
 # FORMULÁRIO NORMAL (SÓ APARECE SE AINDA NÃO ENVIADO)
 # =========================================================
 else:
-    # TÍTULO
     st.markdown("<h1 style='text-align:center;'>Pesquisa de Satisfação</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;'>Sua opinião é muito importante para nós! Leva menos de 40 segundos.</p>", unsafe_allow_html=True)
     st.markdown("---")
@@ -106,7 +108,6 @@ else:
     segmento = st.radio("**Sua compra na Pureto foi?**", ["Restaurante (Salão)", "Delivery (Entrega)"], horizontal=True, key="segmento_selecionado")
     st.markdown("---")
 
-    # LÓGICA COMO CONHECEU
     if segmento == "Restaurante (Salão)":
         opcoes_conheceu = [
             "Selecione uma opção","Já era cliente do delivery","Instagram","Facebook","Google",
@@ -126,7 +127,6 @@ else:
     else:
         como_outro = ""
 
-    # FORMULÁRIO
     with st.form("pesquisa_form"):
         st.subheader("Sobre você")
         col1, col2, col3 = st.columns(3)
@@ -165,9 +165,6 @@ else:
         comentario = st.text_area("💬 Comentários, sugestões, elogios ou reclamações (opcional):", max_chars=500, key="comentario_input_form")
         submit = st.form_submit_button("Enviar Respostas ✅")
 
-    # =========================================================
-    # PROCESSAMENTO DO ENVIO
-    # =========================================================
     if submit:
         if not nome or not whatsapp or como_conheceu == "Selecione uma opção":
             st.error("⚠️ Por favor, preencha Nome, WhatsApp e Como nos conheceu.")
@@ -191,7 +188,6 @@ else:
             }])
             st.session_state.respostas = pd.concat([st.session_state.respostas, nova], ignore_index=True)
 
-            # Define parâmetros na URL e recarrega
             params = st.query_params.to_dict()
             params.update({
                 "submit_status": "success",
